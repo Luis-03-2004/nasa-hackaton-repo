@@ -41,12 +41,12 @@ export function Header({
   onDownload: () => void
 }) {
   return (
-    <header className="border-b border-white/10 bg-[#0e1420]/90 px-4 py-3 backdrop-blur-md">
+    <header className="border-b border-white/10 bg-[#071a3d]/90 px-4 py-3 backdrop-blur-md">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
         <div className="mr-2 flex items-center gap-3">
-          <span className="h-9 w-1 rounded-full bg-[#ff6a2c]" />
+          <span className="h-9 w-1 rounded-full bg-[#fc3d21]" />
           <div>
-            <p className="font-mono text-[10px] tracking-[0.2em] text-[#ff8a55] uppercase">
+            <p className="font-mono text-[10px] tracking-[0.2em] text-[#ff8a73] uppercase">
               NASA Space Apps
             </p>
             <h1 className="text-lg leading-none font-semibold tracking-tight">FireCal Global</h1>
@@ -63,8 +63,8 @@ export function Header({
                 onClick={() => onRegionChange(chip.id)}
                 className={`rounded-full border px-3 py-1 text-sm transition ${
                   active
-                    ? 'border-[#ff6a2c] bg-[#ff6a2c]/15 text-white'
-                    : 'border-white/10 bg-white/5 text-[#c5d0e0] hover:border-white/25'
+                    ? 'border-[#fc3d21] bg-[#fc3d21]/15 text-white'
+                    : 'border-white/10 bg-white/5 text-[#d6e2f5] hover:border-white/25'
                 }`}
               >
                 {chip.label}
@@ -75,7 +75,7 @@ export function Header({
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-sm">
-            <span className="font-mono text-[10px] text-[#93a4bd]">LAT</span>
+            <span className="font-mono text-[10px] text-[#9bb0d1]">LAT</span>
             <input
               value={lat}
               onChange={(event) => onLatChange(event.target.value)}
@@ -83,13 +83,13 @@ export function Header({
               onKeyDown={(event) => {
                 if (event.key === 'Enter') onApplyCoordinates()
               }}
-              className="w-16 bg-transparent font-mono text-[#f4f7fb] outline-none"
+              className="w-16 bg-transparent font-mono text-[#f7f9fc] outline-none"
               inputMode="decimal"
               aria-label="Latitude"
             />
           </label>
           <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-sm">
-            <span className="font-mono text-[10px] text-[#93a4bd]">LON</span>
+            <span className="font-mono text-[10px] text-[#9bb0d1]">LON</span>
             <input
               value={lon}
               onChange={(event) => onLonChange(event.target.value)}
@@ -97,7 +97,7 @@ export function Header({
               onKeyDown={(event) => {
                 if (event.key === 'Enter') onApplyCoordinates()
               }}
-              className="w-16 bg-transparent font-mono text-[#f4f7fb] outline-none"
+              className="w-16 bg-transparent font-mono text-[#f7f9fc] outline-none"
               inputMode="decimal"
               aria-label="Longitude"
             />
@@ -105,7 +105,7 @@ export function Header({
           <button
             type="button"
             onClick={onLocate}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-1.5 text-sm text-[#d5deea] hover:border-[#3dd6f5]/50"
+            className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-1.5 text-sm text-[#d6e2f5] hover:border-[#6ea2ff]/50"
           >
             <LocateFixed size={15} />
             Meu GPS
@@ -114,7 +114,7 @@ export function Header({
             type="button"
             disabled={!downloadEnabled}
             onClick={onDownload}
-            className="inline-flex items-center gap-2 rounded-lg bg-[#ff6a2c] px-3 py-1.5 text-sm font-semibold text-[#1a0d07] disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg bg-[#fc3d21] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
           >
             <Download size={15} />
             Baixar CSV
@@ -123,19 +123,19 @@ export function Header({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
-        <p className="font-mono text-xs text-[#93a4bd]">Período 2020–2025</p>
+        <p className="font-mono text-xs text-[#9bb0d1]">Período 2020–2025</p>
         <div className="flex rounded-full border border-white/10 p-0.5">
           <button
             type="button"
             onClick={() => onMetricChange('harmonized')}
-            className={`rounded-full px-3 py-1 ${metric === 'harmonized' ? 'bg-white/10 text-white' : 'text-[#93a4bd]'}`}
+            className={`rounded-full px-3 py-1 ${metric === 'harmonized' ? 'bg-white/10 text-white' : 'text-[#9bb0d1]'}`}
           >
             Índice harmonizado
           </button>
           <button
             type="button"
             onClick={() => onMetricChange('sensors')}
-            className={`rounded-full px-3 py-1 ${metric === 'sensors' ? 'bg-white/10 text-white' : 'text-[#93a4bd]'}`}
+            className={`rounded-full px-3 py-1 ${metric === 'sensors' ? 'bg-white/10 text-white' : 'text-[#9bb0d1]'}`}
           >
             Comparar sensores
           </button>
@@ -143,13 +143,13 @@ export function Header({
         <p
           className={`rounded-full border px-3 py-1 font-mono text-[11px] ${
             calibrated
-              ? 'border-[#3dd6f5]/40 text-[#9be8f8]'
-              : 'border-white/10 text-[#93a4bd]'
+              ? 'border-[#6ea2ff]/40 text-[#c5d9ff]'
+              : 'border-white/10 text-[#9bb0d1]'
           }`}
         >
           {calibrated ? 'Calibração regional · grade 0,25° / 10 km' : 'Padrão global · grade 0,5°'}
         </p>
-        {gpsMessage ? <p className="text-[#f5b942]">{gpsMessage}</p> : null}
+        {gpsMessage ? <p className="text-[#ffb0a1]">{gpsMessage}</p> : null}
       </div>
     </header>
   )

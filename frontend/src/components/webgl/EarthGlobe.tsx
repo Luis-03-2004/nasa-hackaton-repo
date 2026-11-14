@@ -37,7 +37,7 @@ function SelectionPin({ lat, lon }: GlobePick) {
   return (
     <mesh position={latLonToVector3(lat, lon, 1.02)}>
       <sphereGeometry args={[0.016, 16, 16]} />
-      <meshBasicMaterial color="#f4f7fb" />
+      <meshBasicMaterial color="#f7f9fc" />
     </mesh>
   )
 }
@@ -89,7 +89,7 @@ export function EarthGlobe({
   return (
     <div className="relative h-full w-full">
       <Canvas camera={{ position: [0, 0.35, 2.8], fov: 42 }} dpr={[1, 2]}>
-        <color attach="background" args={['#0b0f17']} />
+        <color attach="background" args={['#04122b']} />
         <ambientLight intensity={0.55} />
         <directionalLight position={[4, 2, 3]} intensity={1.8} />
         <GlobeRig focus={aim}>
@@ -109,7 +109,7 @@ export function EarthGlobe({
         />
       </Canvas>
       {aim ? (
-        <p className="pointer-events-none absolute bottom-3 left-3 rounded-md border border-white/10 bg-[#0e1420]/80 px-2 py-1 font-mono text-[11px] text-[#f4f7fb]">
+        <p className="pointer-events-none absolute bottom-3 left-3 rounded-md border border-white/10 bg-[#071a3d]/80 px-2 py-1 font-mono text-[11px] text-[#f7f9fc]">
           {aim.lat.toFixed(2)}°, {aim.lon.toFixed(2)}°
         </p>
       ) : null}

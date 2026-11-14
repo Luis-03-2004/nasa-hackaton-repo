@@ -18,7 +18,7 @@ function ChartStatus({
 }) {
   return (
     <div className="flex h-full min-h-40 flex-col items-center justify-center gap-3 px-6 text-center">
-      <p className="text-sm text-[#93a4bd]">{message}</p>
+      <p className="text-sm text-[#9bb0d1]">{message}</p>
       {onRetry ? (
         <button
           type="button"

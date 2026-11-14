@@ -68,9 +68,9 @@ export function HotspotMarker({
       </mesh>
       {hovered ? (
         <Html position={[0, 0, 0.08]} center zIndexRange={[30, 0]} style={{ pointerEvents: 'none' }}>
-          <div className="w-44 rounded-lg border border-white/10 bg-[#0e1420]/95 p-2 text-left shadow-xl">
+          <div className="w-44 rounded-lg border border-white/10 bg-[#071a3d]/95 p-2 text-left shadow-xl">
             <p className="text-sm font-semibold text-white">{label}</p>
-            <p className="mt-1 font-mono text-[10px] text-[#93a4bd]">
+            <p className="mt-1 font-mono text-[10px] text-[#9bb0d1]">
               {lat.toFixed(1)}°, {lon.toFixed(1)}°
             </p>
             <div className="mt-2">

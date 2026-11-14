@@ -6,23 +6,23 @@ const LEVELS: Record<
 > = {
   NORMAL: {
     label: 'Normal',
-    dot: 'bg-[#3dd6f5]',
-    chip: 'border-[#3dd6f5]/40 bg-[#3dd6f5]/10 text-[#b7f3ff]',
+    dot: 'bg-[#6ea2ff]',
+    chip: 'border-[#6ea2ff]/40 bg-[#0b3d91]/40 text-[#d6e6ff]',
   },
   ATENCAO: {
     label: 'Atenção',
-    dot: 'bg-[#f5b942]',
-    chip: 'border-[#f5b942]/40 bg-[#f5b942]/10 text-[#ffe3a3]',
+    dot: 'bg-white',
+    chip: 'border-white/40 bg-white/10 text-white',
   },
   ALERTA_ALTO: {
     label: 'Alerta alto',
-    dot: 'bg-[#ff6a2c]',
-    chip: 'border-[#ff6a2c]/50 bg-[#ff6a2c]/15 text-[#ffd0bc]',
+    dot: 'bg-[#fc3d21]',
+    chip: 'border-[#fc3d21]/60 bg-[#fc3d21]/15 text-[#ffd4cc]',
   },
   CRITICO: {
     label: 'Janela crítica',
-    dot: 'bg-[#ff4d4d]',
-    chip: 'border-[#ff4d4d]/50 bg-[#ff4d4d]/15 text-[#ffc7c7]',
+    dot: 'bg-white',
+    chip: 'border-[#fc3d21] bg-[#fc3d21] text-white',
   },
 }
 

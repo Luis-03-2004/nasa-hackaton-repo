@@ -13,11 +13,11 @@ import type { HarmonizedDataPoint } from '../../types/api'
 const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
 
 const RAMP: Array<[number, number, number]> = [
-  [11, 36, 74],
-  [27, 111, 148],
-  [61, 214, 245],
-  [245, 185, 66],
-  [214, 54, 46],
+  [11, 61, 145],
+  [46, 107, 181],
+  [143, 180, 232],
+  [252, 61, 33],
+  [255, 122, 102],
 ]
 
 interface HeatCell {
@@ -87,12 +87,12 @@ function HeatTooltip({ active, payload }: TooltipContentProps) {
   if (!active || !cell) return null
 
   return (
-    <div className="rounded-lg border border-white/10 bg-[#0e1420] px-3 py-2 text-xs">
-      <p className="font-mono text-[#93a4bd]">
+    <div className="rounded-lg border border-white/10 bg-[#071a3d] px-3 py-2 text-xs">
+      <p className="font-mono text-[#9bb0d1]">
         {cell.year} · {cell.month}
       </p>
       <p className="mt-1 text-sm text-white">{cell.value}</p>
-      <p className="mt-2 text-[10px] leading-snug text-[#93a4bd]">
+      <p className="mt-2 text-[10px] leading-snug text-[#9bb0d1]">
         Média mensal dos pixels FIRMS. Zero não prova ausência de fogo.
       </p>
     </div>
@@ -110,21 +110,21 @@ export function Heatmap({ series }: { series: HarmonizedDataPoint[] }) {
           <button
             type="button"
             onClick={() => setMode('harmonized')}
-            className={`rounded-full px-2.5 py-1 ${mode === 'harmonized' ? 'bg-white/10 text-white' : 'text-[#93a4bd]'}`}
+            className={`rounded-full px-2.5 py-1 ${mode === 'harmonized' ? 'bg-white/10 text-white' : 'text-[#9bb0d1]'}`}
           >
             Intensidade
           </button>
           <button
             type="button"
             onClick={() => setMode('anomaly')}
-            className={`rounded-full px-2.5 py-1 ${mode === 'anomaly' ? 'bg-white/10 text-white' : 'text-[#93a4bd]'}`}
+            className={`rounded-full px-2.5 py-1 ${mode === 'anomaly' ? 'bg-white/10 text-white' : 'text-[#9bb0d1]'}`}
           >
             Anomalia %
           </button>
         </div>
-        <div className="flex items-center gap-2 font-mono text-[10px] text-[#93a4bd]">
+        <div className="flex items-center gap-2 font-mono text-[10px] text-[#9bb0d1]">
           <span>Baixa</span>
-          <span className="h-2 w-24 rounded-full bg-linear-to-r from-[#0b244a] via-[#3dd6f5] to-[#d6362e]" />
+          <span className="h-2 w-24 rounded-full bg-linear-to-r from-[#0b3d91] via-[#8fb4e8] to-[#fc3d21]" />
           <span>Extrema</span>
         </div>
       </div>
@@ -135,7 +135,7 @@ export function Heatmap({ series }: { series: HarmonizedDataPoint[] }) {
               dataKey="month"
               type="category"
               allowDuplicatedCategory={false}
-              tick={{ fill: '#93a4bd', fontSize: 11 }}
+              tick={{ fill: '#9bb0d1', fontSize: 11 }}
               axisLine={false}
               tickLine={false}
             />
@@ -144,7 +144,7 @@ export function Heatmap({ series }: { series: HarmonizedDataPoint[] }) {
               type="category"
               reversed
               allowDuplicatedCategory={false}
-              tick={{ fill: '#93a4bd', fontSize: 11 }}
+              tick={{ fill: '#9bb0d1', fontSize: 11 }}
               axisLine={false}
               tickLine={false}
               width={52}
@@ -154,7 +154,7 @@ export function Heatmap({ series }: { series: HarmonizedDataPoint[] }) {
           </ScatterChart>
         </ResponsiveContainer>
       </div>
-      <p className="mt-1 text-[11px] text-[#93a4bd]">
+      <p className="mt-1 text-[11px] text-[#9bb0d1]">
         Célula igual a 0 = sem detecção registrada nos arquivos. Não comprova ausência de fogo.
       </p>
     </div>

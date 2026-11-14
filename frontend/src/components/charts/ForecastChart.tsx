@@ -21,7 +21,7 @@ interface ForecastPoint {
   p90: number | null
 }
 
-const axis = { fill: '#93a4bd', fontSize: 11 }
+const axis = { fill: '#9bb0d1', fontSize: 11 }
 const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
 
 function buildPoints(series: HarmonizedDataPoint[], forecast: LocalForecast): ForecastPoint[] {
@@ -90,19 +90,19 @@ export function ForecastChart({
         </div>
         <dl className="grid grid-cols-3 gap-3 text-right">
           <div>
-            <dt className="font-mono text-[10px] tracking-wide text-[#93a4bd] uppercase">Desvio recente</dt>
-            <dd className="text-sm text-[#ffb088]">
+            <dt className="font-mono text-[10px] tracking-wide text-[#9bb0d1] uppercase">Desvio recente</dt>
+            <dd className="text-sm text-[#ffb0a1]">
               {sign}
               {forecast.recent_anomaly_pct}%
             </dd>
           </div>
           <div>
-            <dt className="font-mono text-[10px] tracking-wide text-[#93a4bd] uppercase">Pico local</dt>
+            <dt className="font-mono text-[10px] tracking-wide text-[#9bb0d1] uppercase">Pico local</dt>
             <dd className="text-sm text-white">{peakWindow(series)}</dd>
           </div>
           <div>
-            <dt className="font-mono text-[10px] tracking-wide text-[#93a4bd] uppercase">Backtest MAE</dt>
-            <dd className="text-sm text-[#9be8f8]">−68,2%</dd>
+            <dt className="font-mono text-[10px] tracking-wide text-[#9bb0d1] uppercase">Backtest MAE</dt>
+            <dd className="text-sm text-[#c5d9ff]">−68,2%</dd>
           </div>
         </dl>
       </div>
@@ -113,13 +113,13 @@ export function ForecastChart({
             <XAxis dataKey="label" tick={axis} axisLine={false} tickLine={false} />
             <YAxis tick={axis} axisLine={false} tickLine={false} width={36} />
             <Tooltip content={ChartTooltip} />
-            <Area type="monotone" dataKey="p90" name="P90" stroke="none" fill="rgba(255,106,44,0.28)" connectNulls />
-            <Area type="monotone" dataKey="p10" name="P10" stroke="none" fill="#121826" connectNulls />
+            <Area type="monotone" dataKey="p90" name="P90" stroke="none" fill="rgba(252,61,33,0.35)" connectNulls />
+            <Area type="monotone" dataKey="p10" name="P10" stroke="none" fill="#071a3a" connectNulls />
             <Line
               type="monotone"
               dataKey="baseline"
               name="Climatologia"
-              stroke="#93a4bd"
+              stroke="#9bb0d1"
               strokeDasharray="2 4"
               dot={false}
               connectNulls
@@ -128,24 +128,24 @@ export function ForecastChart({
               type="monotone"
               dataKey="observed"
               name="Observado"
-              stroke="#ff6a2c"
+              stroke="#fc3d21"
               strokeWidth={2.4}
-              dot={{ r: 2, fill: '#ff6a2c' }}
+              dot={{ r: 2, fill: '#fc3d21' }}
             />
             <Line
               type="monotone"
               dataKey="forecast"
               name="Previsão"
-              stroke="#ffd7c2"
+              stroke="#ffd4cc"
               strokeDasharray="5 4"
               strokeWidth={2}
-              dot={{ r: 2, fill: '#ffd7c2' }}
+              dot={{ r: 2, fill: '#ffd4cc' }}
               connectNulls
             />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
-      <p className="mt-1 text-[11px] text-[#93a4bd]">
+      <p className="mt-1 text-[11px] text-[#9bb0d1]">
         Projeção estatística da memória sazonal local e da anomalia recente. Não substitui modelo meteorológico de ignição.
       </p>
     </div>

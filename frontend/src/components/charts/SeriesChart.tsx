@@ -12,7 +12,7 @@ import type { SeriesMetric } from '../layout/Header'
 import { ChartTooltip } from './ChartTooltip'
 import type { HarmonizedDataPoint } from '../../types/api'
 
-const axis = { fill: '#93a4bd', fontSize: 11 }
+const axis = { fill: '#9bb0d1', fontSize: 11 }
 
 export function SeriesChart({
   series,
@@ -47,7 +47,7 @@ export function SeriesChart({
                   type="monotone"
                   dataKey="harmonized_index"
                   name="Índice harmonizado"
-                  stroke="#ff6a2c"
+                  stroke="#fc3d21"
                   dot={false}
                   strokeWidth={2}
                 />
@@ -55,26 +55,26 @@ export function SeriesChart({
                   type="monotone"
                   dataKey="baseline_mean"
                   name="Média da época"
-                  stroke="#3dd6f5"
+                  stroke="#6ea2ff"
                   dot={false}
                   strokeDasharray="4 4"
                 />
               </>
             ) : (
               <>
-                <Line type="monotone" dataKey="n_modis" name="MODIS" stroke="#f5b942" dot={false} />
+                <Line type="monotone" dataKey="n_modis" name="MODIS" stroke="#fc3d21" dot={false} />
                 <Line
                   type="monotone"
                   dataKey="n_viirs_snpp"
                   name="VIIRS S-NPP"
-                  stroke="#3dd6f5"
+                  stroke="#6ea2ff"
                   dot={false}
                 />
                 <Line
                   type="monotone"
                   dataKey="n_viirs_jpss1"
                   name="VIIRS JPSS-1"
-                  stroke="#d6d6ff"
+                  stroke="#f7f9fc"
                   dot={false}
                 />
               </>
@@ -82,7 +82,7 @@ export function SeriesChart({
           </LineChart>
         </ResponsiveContainer>
       </div>
-      <p className="mt-1 text-[11px] text-[#93a4bd]">
+      <p className="mt-1 text-[11px] text-[#9bb0d1]">
         Pixel não é um incêndio único. FRP é potência instantânea, em MW. Crédito: NASA FIRMS / CONAE.
       </p>
     </div>
