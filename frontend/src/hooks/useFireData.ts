@@ -12,7 +12,6 @@ export function useFireData() {
 
   useEffect(() => {
     const controller = new AbortController()
-    setStatus('loading')
 
     fetchFireCatalog(controller.signal)
       .then((data) => {
@@ -34,6 +33,10 @@ export function useFireData() {
     catalog,
     status,
     error,
-    reload: () => setAttempt((value) => value + 1),
+    reload: () => {
+      setStatus('loading')
+      setError(null)
+      setAttempt((value) => value + 1)
+    },
   }
 }

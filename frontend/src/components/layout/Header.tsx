@@ -1,5 +1,4 @@
 import { Download, LocateFixed } from 'lucide-react'
-import { useState } from 'react'
 
 const CHIPS = [
   { id: 'world', label: '🌎 Mundo inteiro' },
@@ -9,31 +8,39 @@ const CHIPS = [
   { id: 'pantanal', label: '🐊 Pantanal' },
 ] as const
 
-export function Header() {
-  const [region, setRegion] = useState<(typeof CHIPS)[number]['id']>('cerrado')
-  const [metric, setMetric] = useState<'harmonized' | 'sensors'>('harmonized')
-  const [lat, setLat] = useState('-12.00')
-  const [lon, setLon] = useState('-46.00')
-  const [gpsMessage, setGpsMessage] = useState<string | null>(null)
+export type SeriesMetric = 'harmonized' | 'sensors'
 
-  const deepCalibration = region !== 'world'
-
-  function useMyLocation() {
-    if (!navigator.geolocation) {
-      setGpsMessage('GPS indisponível neste navegador.')
-      return
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setLat(position.coords.latitude.toFixed(2))
-        setLon(position.coords.longitude.toFixed(2))
-        setGpsMessage(null)
-      },
-      () => setGpsMessage('Não foi possível ler a localização.'),
-    )
-  }
-
+export function Header({
+  regionId,
+  lat,
+  lon,
+  metric,
+  calibrated,
+  gpsMessage,
+  downloadEnabled,
+  onRegionChange,
+  onLatChange,
+  onLonChange,
+  onApplyCoordinates,
+  onLocate,
+  onMetricChange,
+  onDownload,
+}: {
+  regionId: string
+  lat: string
+  lon: string
+  metric: SeriesMetric
+  calibrated: boolean
+  gpsMessage: string | null
+  downloadEnabled: boolean
+  onRegionChange: (id: string) => void
+  onLatChange: (value: string) => void
+  onLonChange: (value: string) => void
+  onApplyCoordinates: () => void
+  onLocate: () => void
+  onMetricChange: (metric: SeriesMetric) => void
+  onDownload: () => void
+}) {
   return (
     <header className="border-b border-white/10 bg-[#0e1420]/90 px-4 py-3 backdrop-blur-md">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
@@ -49,12 +56,12 @@ export function Header() {
 
         <div className="flex flex-wrap gap-2">
           {CHIPS.map((chip) => {
-            const active = chip.id === region
+            const active = chip.id === regionId
             return (
               <button
                 key={chip.id}
                 type="button"
-                onClick={() => setRegion(chip.id)}
+                onClick={() => onRegionChange(chip.id)}
                 className={`rounded-full border px-3 py-1 text-sm transition ${
                   active
                     ? 'border-[#ff6a2c] bg-[#ff6a2c]/15 text-white'
@@ -72,7 +79,11 @@ export function Header() {
             <span className="font-mono text-[10px] text-[#93a4bd]">LAT</span>
             <input
               value={lat}
-              onChange={(event) => setLat(event.target.value)}
+              onChange={(event) => onLatChange(event.target.value)}
+              onBlur={onApplyCoordinates}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') onApplyCoordinates()
+              }}
               className="w-16 bg-transparent font-mono text-[#f4f7fb] outline-none"
               inputMode="decimal"
               aria-label="Latitude"
@@ -82,7 +93,11 @@ export function Header() {
             <span className="font-mono text-[10px] text-[#93a4bd]">LON</span>
             <input
               value={lon}
-              onChange={(event) => setLon(event.target.value)}
+              onChange={(event) => onLonChange(event.target.value)}
+              onBlur={onApplyCoordinates}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') onApplyCoordinates()
+              }}
               className="w-16 bg-transparent font-mono text-[#f4f7fb] outline-none"
               inputMode="decimal"
               aria-label="Longitude"
@@ -90,7 +105,7 @@ export function Header() {
           </label>
           <button
             type="button"
-            onClick={useMyLocation}
+            onClick={onLocate}
             className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-1.5 text-sm text-[#d5deea] hover:border-[#3dd6f5]/50"
           >
             <LocateFixed size={15} />
@@ -98,9 +113,9 @@ export function Header() {
           </button>
           <button
             type="button"
-            disabled
-            title="O download entra quando a série harmonizada estiver carregada."
-            className="inline-flex items-center gap-2 rounded-lg bg-[#ff6a2c] px-3 py-1.5 text-sm font-semibold text-[#1a0d07] opacity-50"
+            disabled={!downloadEnabled}
+            onClick={onDownload}
+            className="inline-flex items-center gap-2 rounded-lg bg-[#ff6a2c] px-3 py-1.5 text-sm font-semibold text-[#1a0d07] disabled:opacity-50"
           >
             <Download size={15} />
             Baixar CSV
@@ -113,14 +128,14 @@ export function Header() {
         <div className="flex rounded-full border border-white/10 p-0.5">
           <button
             type="button"
-            onClick={() => setMetric('harmonized')}
+            onClick={() => onMetricChange('harmonized')}
             className={`rounded-full px-3 py-1 ${metric === 'harmonized' ? 'bg-white/10 text-white' : 'text-[#93a4bd]'}`}
           >
             Índice harmonizado
           </button>
           <button
             type="button"
-            onClick={() => setMetric('sensors')}
+            onClick={() => onMetricChange('sensors')}
             className={`rounded-full px-3 py-1 ${metric === 'sensors' ? 'bg-white/10 text-white' : 'text-[#93a4bd]'}`}
           >
             Comparar sensores
@@ -128,14 +143,12 @@ export function Header() {
         </div>
         <p
           className={`rounded-full border px-3 py-1 font-mono text-[11px] ${
-            deepCalibration
+            calibrated
               ? 'border-[#3dd6f5]/40 text-[#9be8f8]'
               : 'border-white/10 text-[#93a4bd]'
           }`}
         >
-          {deepCalibration
-            ? 'Calibração regional · grade 0,25° / 10 km'
-            : 'Padrão global · grade 0,5°'}
+          {calibrated ? 'Calibração regional · grade 0,25° / 10 km' : 'Padrão global · grade 0,5°'}
         </p>
         {gpsMessage ? <p className="text-[#f5b942]">{gpsMessage}</p> : null}
       </div>

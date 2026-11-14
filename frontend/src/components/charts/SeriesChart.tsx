@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import {
   CartesianGrid,
   Legend,
@@ -9,32 +8,21 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import type { SeriesMetric } from '../layout/Header'
 import { ChartTooltip } from './ChartTooltip'
 import type { HarmonizedDataPoint } from '../../types/api'
 
 const axis = { fill: '#93a4bd', fontSize: 11 }
 
-export function SeriesChart({ series }: { series: HarmonizedDataPoint[] }) {
-  const [mode, setMode] = useState<'harmonized' | 'sensors'>('harmonized')
-
+export function SeriesChart({
+  series,
+  mode,
+}: {
+  series: HarmonizedDataPoint[]
+  mode: SeriesMetric
+}) {
   return (
     <div className="flex h-full min-h-64 flex-col px-3 pb-3">
-      <div className="mb-2 flex rounded-full border border-white/10 p-0.5 text-xs self-start">
-        <button
-          type="button"
-          onClick={() => setMode('harmonized')}
-          className={`rounded-full px-2.5 py-1 ${mode === 'harmonized' ? 'bg-white/10 text-white' : 'text-[#93a4bd]'}`}
-        >
-          Curva unificada
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode('sensors')}
-          className={`rounded-full px-2.5 py-1 ${mode === 'sensors' ? 'bg-white/10 text-white' : 'text-[#93a4bd]'}`}
-        >
-          MODIS vs VIIRS
-        </button>
-      </div>
       <div className="min-h-0 flex-1">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={series} margin={{ top: 8, right: 8, bottom: 0, left: -8 }}>
@@ -45,7 +33,10 @@ export function SeriesChart({ series }: { series: HarmonizedDataPoint[] }) {
               axisLine={false}
               tickLine={false}
               interval={51}
-              tickFormatter={(value: string) => value.slice(0, 4)}
+              tickFormatter={(value: string) => {
+                const [year, month] = value.split('-').map(Number)
+                return String(month === 12 ? year + 1 : year)
+              }}
             />
             <YAxis tick={axis} axisLine={false} tickLine={false} width={40} />
             <Tooltip content={ChartTooltip} />

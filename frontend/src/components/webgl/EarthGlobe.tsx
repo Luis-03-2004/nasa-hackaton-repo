@@ -108,9 +108,9 @@ export function EarthGlobe({
           maxDistance={6}
         />
       </Canvas>
-      {picked ? (
+      {aim ? (
         <p className="pointer-events-none absolute bottom-3 left-3 rounded-md border border-white/10 bg-[#0e1420]/80 px-2 py-1 font-mono text-[11px] text-[#f4f7fb]">
-          {picked.lat.toFixed(2)}°, {picked.lon.toFixed(2)}°
+          {aim.lat.toFixed(2)}°, {aim.lon.toFixed(2)}°
         </p>
       ) : null}
     </div>

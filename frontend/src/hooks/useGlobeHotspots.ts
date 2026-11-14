@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import type { Hotspot } from '../components/webgl/HotspotMarker'
 
 export const GLOBE_HOTSPOTS: Hotspot[] = [
@@ -10,7 +9,7 @@ export const GLOBE_HOTSPOTS: Hotspot[] = [
   { id: 'australia', lat: -25.5, lon: 134, color: '#ff7a45', label: 'Austrália', alertLevel: 'NORMAL' },
 ]
 
-function nearestHotspot(lat: number, lon: number) {
+export function nearestHotspot(lat: number, lon: number) {
   return GLOBE_HOTSPOTS.reduce((best, hotspot) => {
     const distance = (hotspot.lat - lat) ** 2 + (hotspot.lon - lon) ** 2
     const bestDistance = (best.lat - lat) ** 2 + (best.lon - lon) ** 2
@@ -19,24 +18,5 @@ function nearestHotspot(lat: number, lon: number) {
 }
 
 export function useGlobeHotspots() {
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const selected = GLOBE_HOTSPOTS.find((hotspot) => hotspot.id === selectedId) ?? null
-
-  function selectNearest(lat: number, lon: number) {
-    const hotspot = nearestHotspot(lat, lon)
-    const distance = Math.hypot(hotspot.lat - lat, hotspot.lon - lon)
-    if (distance > 18) {
-      setSelectedId(null)
-      return null
-    }
-    setSelectedId(hotspot.id)
-    return hotspot
-  }
-
-  return {
-    hotspots: GLOBE_HOTSPOTS,
-    selected,
-    selectId: setSelectedId,
-    selectNearest,
-  }
+  return { hotspots: GLOBE_HOTSPOTS, nearestHotspot }
 }

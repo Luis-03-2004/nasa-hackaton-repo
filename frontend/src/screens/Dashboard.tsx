@@ -1,11 +1,13 @@
+import { useState } from 'react'
 import { ForecastChart } from '../components/charts/ForecastChart'
 import { Heatmap } from '../components/charts/Heatmap'
 import { SeriesChart } from '../components/charts/SeriesChart'
-import { Header } from '../components/layout/Header'
+import { Header, type SeriesMetric } from '../components/layout/Header'
 import { Panel } from '../components/layout/Panel'
 import { EarthGlobe } from '../components/webgl/EarthGlobe'
 import { useFireData } from '../hooks/useFireData'
-import { useGlobeHotspots } from '../hooks/useGlobeHotspots'
+import { nearestHotspot, useGlobeHotspots } from '../hooks/useGlobeHotspots'
+import { downloadSeriesCsv } from '../utils/csv'
 
 function ChartStatus({
   message,
@@ -32,20 +34,97 @@ function ChartStatus({
 
 export function Dashboard() {
   const { catalog, status, error, reload } = useFireData()
-  const region = catalog?.regions.find((item) => item.id === 'cerrado')
-  const { hotspots, selected, selectId, selectNearest } = useGlobeHotspots()
+  const { hotspots } = useGlobeHotspots()
+  const [regionId, setRegionId] = useState('cerrado')
+  const [latDraft, setLatDraft] = useState<string | null>(null)
+  const [lonDraft, setLonDraft] = useState<string | null>(null)
+  const [metric, setMetric] = useState<SeriesMetric>('harmonized')
+  const [gpsMessage, setGpsMessage] = useState<string | null>(null)
+
+  const region = catalog?.regions.find((item) => item.id === regionId) ?? null
+  const lat = latDraft ?? (region ? region.coordinates.lat_center.toFixed(2) : '-12.00')
+  const lon = lonDraft ?? (region ? region.coordinates.lon_center.toFixed(2) : '-46.00')
+
+  function selectRegion(id: string) {
+    setRegionId(id)
+    setLatDraft(null)
+    setLonDraft(null)
+    setGpsMessage(null)
+  }
+
+  function applyCoordinates() {
+    const latValue = Number(lat)
+    const lonValue = Number(lon)
+    const valid =
+      Number.isFinite(latValue) &&
+      Number.isFinite(lonValue) &&
+      latValue >= -90 &&
+      latValue <= 90 &&
+      lonValue >= -180 &&
+      lonValue <= 180
+
+    if (!valid) {
+      setGpsMessage('Use latitude entre -90 e 90 e longitude entre -180 e 180.')
+      return
+    }
+
+    setGpsMessage(null)
+    setLatDraft(null)
+    setLonDraft(null)
+    setRegionId(nearestHotspot(latValue, lonValue).id)
+  }
+
+  function locateUser() {
+    if (!navigator.geolocation) {
+      setGpsMessage('GPS indisponível neste navegador.')
+      return
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        selectRegion(nearestHotspot(position.coords.latitude, position.coords.longitude).id)
+      },
+      () => setGpsMessage('Não foi possível ler a localização.'),
+    )
+  }
+
+  function downloadCsv() {
+    if (!region) return
+    downloadSeriesCsv(`firecal-${regionId}.csv`, region.historical_series)
+  }
+
   const waiting = status !== 'ready' || !region
+  const focus = region
+    ? { lat: region.coordinates.lat_center, lon: region.coordinates.lon_center }
+    : null
 
   return (
     <div className="flex h-full min-h-screen flex-col">
-      <Header />
+      <Header
+        regionId={regionId}
+        lat={lat}
+        lon={lon}
+        metric={metric}
+        calibrated={region?.calibration_status === 'calibrated_local'}
+        gpsMessage={gpsMessage}
+        downloadEnabled={Boolean(region)}
+        onRegionChange={selectRegion}
+        onLatChange={setLatDraft}
+        onLonChange={setLonDraft}
+        onApplyCoordinates={applyCoordinates}
+        onLocate={locateUser}
+        onMetricChange={setMetric}
+        onDownload={downloadCsv}
+      />
       <main className="grid min-h-0 flex-1 grid-cols-1 gap-3 p-3 lg:grid-cols-2 lg:grid-rows-2">
-        <Panel eyebrow="01 · Globo" title={selected?.label ?? 'Atividade de queima no planeta'}>
+        <Panel eyebrow="01 · Globo" title={region?.region_name ?? 'Atividade de queima no planeta'}>
           <EarthGlobe
             hotspots={hotspots}
-            focus={selected ? { lat: selected.lat, lon: selected.lon } : null}
-            onSelect={({ lat, lon }) => selectNearest(lat, lon)}
-            onHotspotSelect={selectId}
+            focus={focus}
+            onSelect={({ lat: pickedLat, lon: pickedLon }) => {
+              selectRegion(nearestHotspot(pickedLat, pickedLon).id)
+            }}
+            onHotspotSelect={selectRegion}
           />
         </Panel>
         <Panel eyebrow="02 · Previsão" title="Horizonte local de 4 semanas">
@@ -73,7 +152,7 @@ export function Dashboard() {
           {waiting || !region ? (
             <ChartStatus message={status === 'error' ? 'Série indisponível.' : 'Carregando histórico…'} />
           ) : (
-            <SeriesChart series={region.historical_series} />
+            <SeriesChart series={region.historical_series} mode={metric} />
           )}
         </Panel>
       </main>
