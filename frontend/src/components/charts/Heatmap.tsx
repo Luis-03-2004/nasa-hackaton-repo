@@ -92,6 +92,9 @@ function HeatTooltip({ active, payload }: TooltipContentProps) {
         {cell.year} · {cell.month}
       </p>
       <p className="mt-1 text-sm text-white">{cell.value}</p>
+      <p className="mt-2 text-[10px] leading-snug text-[#93a4bd]">
+        Média mensal dos pixels FIRMS. Zero não prova ausência de fogo.
+      </p>
     </div>
   )
 }

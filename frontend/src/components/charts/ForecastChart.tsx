@@ -8,6 +8,8 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import { AlertBadge } from '../layout/AlertBadge'
+import { ChartTooltip } from './ChartTooltip'
 import type { HarmonizedDataPoint, LocalForecast } from '../../types/api'
 
 interface ForecastPoint {
@@ -82,7 +84,9 @@ export function ForecastChart({
       <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
         <div>
           <p className="text-sm text-white">{regionName}</p>
-          <p className="font-mono text-[11px] text-[#93a4bd]">{forecast.alert_level.replaceAll('_', ' ')}</p>
+          <div className="mt-1">
+            <AlertBadge level={forecast.alert_level} />
+          </div>
         </div>
         <dl className="grid grid-cols-3 gap-3 text-right">
           <div>
@@ -108,16 +112,9 @@ export function ForecastChart({
             <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
             <XAxis dataKey="label" tick={axis} axisLine={false} tickLine={false} />
             <YAxis tick={axis} axisLine={false} tickLine={false} width={36} />
-            <Tooltip
-              contentStyle={{
-                background: '#0e1420',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 8,
-                fontSize: 12,
-              }}
-            />
-            <Area type="monotone" dataKey="p90" stroke="none" fill="rgba(255,106,44,0.28)" connectNulls />
-            <Area type="monotone" dataKey="p10" stroke="none" fill="#121826" connectNulls />
+            <Tooltip content={ChartTooltip} />
+            <Area type="monotone" dataKey="p90" name="P90" stroke="none" fill="rgba(255,106,44,0.28)" connectNulls />
+            <Area type="monotone" dataKey="p10" name="P10" stroke="none" fill="#121826" connectNulls />
             <Line
               type="monotone"
               dataKey="baseline"

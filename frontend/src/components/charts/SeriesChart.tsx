@@ -9,6 +9,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import { ChartTooltip } from './ChartTooltip'
 import type { HarmonizedDataPoint } from '../../types/api'
 
 const axis = { fill: '#93a4bd', fontSize: 11 }
@@ -47,14 +48,7 @@ export function SeriesChart({ series }: { series: HarmonizedDataPoint[] }) {
               tickFormatter={(value: string) => value.slice(0, 4)}
             />
             <YAxis tick={axis} axisLine={false} tickLine={false} width={40} />
-            <Tooltip
-              contentStyle={{
-                background: '#0e1420',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 8,
-                fontSize: 12,
-              }}
-            />
+            <Tooltip content={ChartTooltip} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             {mode === 'harmonized' ? (
               <>
