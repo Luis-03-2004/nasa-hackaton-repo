@@ -1,16 +1,17 @@
 import { OrbitControls, useTexture } from '@react-three/drei'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
-  CanvasTexture,
+  Color,
   LinearFilter,
   LinearMipmapLinearFilter,
   Quaternion,
   SRGBColorSpace,
   Vector3,
   type Group,
+  type WebGLProgramParametersWithUniforms,
 } from 'three'
-import earthMap from '../../assets/earth-map.webp'
+import earthMap from '../../assets/earth-map.jpg'
 import { latLonToVector3, vector3ToLatLon } from '../../utils/geo'
 import { HotspotTooltip, type Hotspot } from './HotspotMarker'
 
@@ -19,18 +20,60 @@ export interface GlobePick {
   lon: number
 }
 
-const DOT_RADIUS_PX = 3
+const EARTH_RADIUS_KM = 6371
+const KM_PER_DEG = (Math.PI / 180) * EARTH_RADIUS_KM
+const HOTSPOT_DIAMETER_KM = 4
+const HOTSPOT_RADIUS_KM = HOTSPOT_DIAMETER_KM / 2
+const HOTSPOT_SLOTS = 8
+const FOV_DEG = 42
+const MIN_CAMERA_DISTANCE =
+  1 +
+  (HOTSPOT_DIAMETER_KM / EARTH_RADIUS_KM) *
+    (500 / (4 * ((FOV_DEG * Math.PI) / 180)))
 
-function hotspotNear(hotspots: Hotspot[], lat: number, lon: number, maxDeg = 3) {
-  const limit = maxDeg * maxDeg
+const HOTSPOT_UNIFORMS = /* glsl */ `
+uniform int hotspotCount;
+uniform float hotspotLat[8];
+uniform float hotspotLon[8];
+uniform vec3 hotspotColor[8];
+uniform float hotspotRadiusKm;
+uniform float hotspotDiameterKm;
+`
+
+const HOTSPOT_PAINT = /* glsl */ `
+{
+  float lat = vMapUv.y * 180.0 - 90.0;
+  float lon = vMapUv.x * 360.0 - 180.0;
+  float cosLat = cos(radians(lat));
+  for (int i = 0; i < 8; i++) {
+    if (i >= hotspotCount) continue;
+    float dLat = lat - hotspotLat[i];
+    float dLon = mod(lon - hotspotLon[i] + 540.0, 360.0) - 180.0;
+    float northKm = dLat * ${KM_PER_DEG.toFixed(5)};
+    float eastKm = dLon * cosLat * ${KM_PER_DEG.toFixed(5)};
+    float distKm = length(vec2(eastKm, northKm));
+    if (fwidth(distKm) < hotspotDiameterKm && distKm <= hotspotRadiusKm) {
+      diffuseColor.rgb = hotspotColor[i];
+    }
+  }
+}
+`
+
+function distanceKm(lat: number, lon: number, hotspot: Hotspot) {
+  let dLon = hotspot.lon - lon
+  if (dLon > 180) dLon -= 360
+  if (dLon < -180) dLon += 360
+  const north = (hotspot.lat - lat) * KM_PER_DEG
+  const east = dLon * Math.cos((lat * Math.PI) / 180) * KM_PER_DEG
+  return Math.hypot(north, east)
+}
+
+function hotspotNear(hotspots: Hotspot[], lat: number, lon: number) {
   let best: Hotspot | null = null
-  let bestDistance = limit
+  let bestDistance = HOTSPOT_RADIUS_KM
 
   for (const hotspot of hotspots) {
-    let dLon = hotspot.lon - lon
-    if (dLon > 180) dLon -= 360
-    if (dLon < -180) dLon += 360
-    const distance = (hotspot.lat - lat) ** 2 + dLon ** 2
+    const distance = distanceKm(lat, lon, hotspot)
     if (distance <= bestDistance) {
       best = hotspot
       bestDistance = distance
@@ -38,27 +81,6 @@ function hotspotNear(hotspots: Hotspot[], lat: number, lon: number, maxDeg = 3) 
   }
 
   return best
-}
-
-function paintEarth(image: HTMLImageElement, hotspots: Hotspot[]) {
-  const canvas = document.createElement('canvas')
-  canvas.width = image.naturalWidth
-  canvas.height = image.naturalHeight
-  const context = canvas.getContext('2d')
-  if (!context) return canvas
-
-  context.drawImage(image, 0, 0)
-
-  for (const hotspot of hotspots) {
-    const x = ((hotspot.lon + 180) / 360) * canvas.width
-    const y = ((90 - hotspot.lat) / 180) * canvas.height
-    context.beginPath()
-    context.fillStyle = hotspot.color
-    context.arc(x, y, DOT_RADIUS_PX, 0, Math.PI * 2)
-    context.fill()
-  }
-
-  return canvas
 }
 
 function EarthSphere({
@@ -72,15 +94,17 @@ function EarthSphere({
 }) {
   const source = useTexture(earthMap)
   const gl = useThree((state) => state.gl)
-  const [painted, setPainted] = useState<CanvasTexture | null>(null)
-  const paintRef = useRef(hotspots)
-  const paintKey = hotspots
-    .map((hotspot) => `${hotspot.id}:${hotspot.lat}:${hotspot.lon}:${hotspot.color}`)
-    .join('|')
-
-  useLayoutEffect(() => {
-    paintRef.current = hotspots
-  })
+  const hotspotUniforms = useMemo(
+    () => ({
+      hotspotCount: { value: 0 },
+      hotspotLat: { value: new Float32Array(HOTSPOT_SLOTS) },
+      hotspotLon: { value: new Float32Array(HOTSPOT_SLOTS) },
+      hotspotColor: { value: Array.from({ length: HOTSPOT_SLOTS }, () => new Vector3()) },
+      hotspotRadiusKm: { value: HOTSPOT_RADIUS_KM },
+      hotspotDiameterKm: { value: HOTSPOT_DIAMETER_KM },
+    }),
+    [],
+  )
 
   useLayoutEffect(() => {
     source.colorSpace = SRGBColorSpace
@@ -91,22 +115,41 @@ function EarthSphere({
     source.needsUpdate = true
   }, [source, gl])
 
-  useEffect(() => {
-    const image = source.image as HTMLImageElement | undefined
-    if (!image?.naturalWidth) return
+  useLayoutEffect(() => {
+    const count = Math.min(hotspots.length, HOTSPOT_SLOTS)
+    hotspotUniforms.hotspotCount.value = count
+    for (let index = 0; index < count; index += 1) {
+      const hotspot = hotspots[index]
+      hotspotUniforms.hotspotLat.value[index] = hotspot.lat
+      hotspotUniforms.hotspotLon.value[index] = hotspot.lon
+      const color = new Color(hotspot.color)
+      hotspotUniforms.hotspotColor.value[index].set(color.r, color.g, color.b)
+    }
+  }, [hotspots, hotspotUniforms])
 
-    const canvas = paintEarth(image, paintRef.current)
-    const texture = new CanvasTexture(canvas)
-    texture.colorSpace = SRGBColorSpace
-    texture.anisotropy = gl.capabilities.getMaxAnisotropy()
-    texture.minFilter = LinearMipmapLinearFilter
-    texture.magFilter = LinearFilter
-    texture.generateMipmaps = true
-    texture.needsUpdate = true
-    setPainted(texture)
-
-    return () => texture.dispose()
-  }, [source, gl, paintKey])
+  const onBeforeCompile = useCallback(
+    (shader: WebGLProgramParametersWithUniforms) => {
+      shader.uniforms.hotspotCount = hotspotUniforms.hotspotCount
+      shader.uniforms.hotspotLat = hotspotUniforms.hotspotLat
+      shader.uniforms.hotspotLon = hotspotUniforms.hotspotLon
+      shader.uniforms.hotspotColor = hotspotUniforms.hotspotColor
+      shader.uniforms.hotspotRadiusKm = hotspotUniforms.hotspotRadiusKm
+      shader.uniforms.hotspotDiameterKm = hotspotUniforms.hotspotDiameterKm
+      const withUniforms = shader.fragmentShader.replace(
+        'void main() {',
+        `${HOTSPOT_UNIFORMS}\nvoid main() {`,
+      )
+      const withPaint = withUniforms.replace(
+        '#include <map_fragment>',
+        `#include <map_fragment>\n${HOTSPOT_PAINT}`,
+      )
+      if (withPaint === shader.fragmentShader) {
+        console.error('Hotspot paint was not injected into the earth shader.')
+      }
+      shader.fragmentShader = withPaint
+    },
+    [hotspotUniforms],
+  )
 
   function hoverAt(point: Vector3) {
     const { lat, lon } = vector3ToLatLon(point)
@@ -129,8 +172,14 @@ function EarthSphere({
         document.body.style.cursor = 'auto'
       }}
     >
-      <sphereGeometry args={[1, 128, 128]} />
-      <meshStandardMaterial map={painted ?? source} roughness={1} metalness={0} />
+      <sphereGeometry args={[1, 256, 256]} />
+      <meshStandardMaterial
+        map={source}
+        roughness={1}
+        metalness={0}
+        onBeforeCompile={onBeforeCompile}
+        customProgramCacheKey={() => 'earth-hotspot-1km'}
+      />
     </mesh>
   )
 }
@@ -184,7 +233,7 @@ export function EarthGlobe({
 
   return (
     <div className="relative h-full w-full">
-      <Canvas camera={{ position: [0, 0.35, 2.8], fov: 42 }} dpr={[1, 2]}>
+      <Canvas camera={{ position: [0, 0.35, 2.8], fov: FOV_DEG, near: 0.0008, far: 30 }} dpr={[1, 2]}>
         <color attach="background" args={['#04122b']} />
         <ambientLight intensity={0.55} />
         <directionalLight position={[4, 2, 3]} intensity={1.8} />
@@ -199,7 +248,7 @@ export function EarthGlobe({
           enableDamping
           rotateSpeed={0.28}
           zoomSpeed={0.4}
-          minDistance={1.12}
+          minDistance={MIN_CAMERA_DISTANCE}
           maxDistance={8}
         />
       </Canvas>
