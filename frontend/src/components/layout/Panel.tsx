@@ -12,7 +12,7 @@ export function Panel({
   children: ReactNode
 }) {
   return (
-    <section className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#121826]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+    <section className="flex h-full min-h-[340px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#121826]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
       <header className="flex items-start justify-between gap-3 px-4 py-3">
         <div>
           <p className="font-mono text-[10px] tracking-[0.18em] text-[#93a4bd] uppercase">

@@ -1,6 +1,9 @@
-import { EarthGlobe } from '../components/webgl/EarthGlobe'
+import { Heatmap } from '../components/charts/Heatmap'
+import { SeriesChart } from '../components/charts/SeriesChart'
 import { Header } from '../components/layout/Header'
 import { Panel } from '../components/layout/Panel'
+import { EarthGlobe } from '../components/webgl/EarthGlobe'
+import { regionById } from '../mocks/regions'
 
 function PendingNote({ children }: { children: string }) {
   return (
@@ -11,6 +14,8 @@ function PendingNote({ children }: { children: string }) {
 }
 
 export function Dashboard() {
+  const region = regionById('cerrado')
+
   return (
     <div className="flex h-full min-h-screen flex-col">
       <Header />
@@ -23,15 +28,11 @@ export function Dashboard() {
             Projeção da localidade selecionada, com a faixa de incerteza P10–P90.
           </PendingNote>
         </Panel>
-        <Panel eyebrow="03 · Calendário" title="Queimada plurianual, 2020–2025">
-          <PendingNote>
-            Matriz anual da atividade harmonizada e da anomalia frente à média da época.
-          </PendingNote>
+        <Panel eyebrow="03 · Calendário" title={`${region.region_name} · 2020–2025`}>
+          <Heatmap series={region.historical_series} />
         </Panel>
         <Panel eyebrow="04 · Série" title="Histórico harmonizado e sensores">
-          <PendingNote>
-            Curva unificada MODIS + VIIRS e a comparação das contagens brutas.
-          </PendingNote>
+          <SeriesChart series={region.historical_series} />
         </Panel>
       </main>
     </div>
