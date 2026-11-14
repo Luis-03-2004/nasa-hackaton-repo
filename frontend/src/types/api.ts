@@ -28,3 +28,7 @@ export interface FireDataResponse {
   historical_series: HarmonizedDataPoint[]
   forecast: LocalForecast
 }
+
+export interface FireDataCatalog {
+  regions: Array<FireDataResponse & { id: string }>
+}
