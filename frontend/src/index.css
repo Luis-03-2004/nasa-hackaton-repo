@@ -1,0 +1,32 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Barlow', 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --color-nasa-red: #fc3d21;
+  --color-nasa-blue: #0b3d91;
+  --color-nasa-ink: #04122b;
+  --color-nasa-panel: #071a3a;
+  --color-nasa-mist: #9bb0d1;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background:
+    radial-gradient(900px 420px at 8% -10%, rgba(252, 61, 33, 0.2), transparent 55%),
+    radial-gradient(780px 480px at 100% 0%, rgba(11, 61, 145, 0.55), transparent 48%),
+    #04122b;
+  color: #f7f9fc;
+  font-family: var(--font-sans);
+}
+
+button,
+input {
+  font: inherit;
+}
