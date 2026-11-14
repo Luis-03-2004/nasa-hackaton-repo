@@ -10,7 +10,7 @@ import {
 } from 'recharts'
 import type { HarmonizedDataPoint } from '../../types/api'
 
-const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 const RAMP: Array<[number, number, number]> = [
   [11, 61, 145],
@@ -63,7 +63,7 @@ function monthlyCells(series: HarmonizedDataPoint[], mode: 'harmonized' | 'anoma
   for (let month = 0; month < 12; month += 1) {
     const column = cells.filter((cell) => cell.month === MONTHS[month])
     const value = column.reduce((sum, cell) => sum + cell.value, 0) / column.length
-    cells.push({ year: 'Média', month: MONTHS[month], value })
+    cells.push({ year: 'Mean', month: MONTHS[month], value })
   }
 
   const values = cells.map((cell) => cell.value)
@@ -93,7 +93,7 @@ function HeatTooltip({ active, payload }: TooltipContentProps) {
       </p>
       <p className="mt-1 text-sm text-white">{cell.value}</p>
       <p className="mt-2 text-[10px] leading-snug text-[#9bb0d1]">
-        Média mensal dos pixels FIRMS. Zero não prova ausência de fogo.
+        Monthly mean of FIRMS pixels. Zero does not prove the absence of fire.
       </p>
     </div>
   )
@@ -112,20 +112,20 @@ export function Heatmap({ series }: { series: HarmonizedDataPoint[] }) {
             onClick={() => setMode('harmonized')}
             className={`rounded-full px-2.5 py-1 ${mode === 'harmonized' ? 'bg-white/10 text-white' : 'text-[#9bb0d1]'}`}
           >
-            Intensidade
+            Intensity
           </button>
           <button
             type="button"
             onClick={() => setMode('anomaly')}
             className={`rounded-full px-2.5 py-1 ${mode === 'anomaly' ? 'bg-white/10 text-white' : 'text-[#9bb0d1]'}`}
           >
-            Anomalia %
+            Anomaly %
           </button>
         </div>
         <div className="flex items-center gap-2 font-mono text-[10px] text-[#9bb0d1]">
-          <span>Baixa</span>
+          <span>Low</span>
           <span className="h-2 w-24 rounded-full bg-linear-to-r from-[#0b3d91] via-[#8fb4e8] to-[#fc3d21]" />
-          <span>Extrema</span>
+          <span>Extreme</span>
         </div>
       </div>
       <div className="min-h-0 flex-1">
@@ -155,7 +155,7 @@ export function Heatmap({ series }: { series: HarmonizedDataPoint[] }) {
         </ResponsiveContainer>
       </div>
       <p className="mt-1 text-[11px] text-[#9bb0d1]">
-        Célula igual a 0 = sem detecção registrada nos arquivos. Não comprova ausência de fogo.
+        A cell equal to 0 means no detection was recorded in the files. It does not prove the absence of fire.
       </p>
     </div>
   )

@@ -22,7 +22,7 @@ interface ForecastPoint {
 }
 
 const axis = { fill: '#9bb0d1', fontSize: 11 }
-const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 function buildPoints(series: HarmonizedDataPoint[], forecast: LocalForecast): ForecastPoint[] {
   const recent = series.slice(-6)
@@ -30,7 +30,7 @@ function buildPoints(series: HarmonizedDataPoint[], forecast: LocalForecast): Fo
   const projected = [forecast.forecast_w1, forecast.forecast_w2, forecast.forecast_w3, forecast.forecast_w4]
 
   const points: ForecastPoint[] = recent.map((point) => ({
-    label: `S${point.iso_week}`,
+    label: `W${point.iso_week}`,
     observed: point.harmonized_index,
     forecast: null,
     baseline: point.baseline_mean,
@@ -47,7 +47,7 @@ function buildPoints(series: HarmonizedDataPoint[], forecast: LocalForecast): Fo
   projected.forEach((value, index) => {
     const factor = 1 + forecast.recent_anomaly_pct / 100
     points.push({
-      label: `+${index + 1} sem`,
+      label: `+${index + 1} wk`,
       observed: null,
       forecast: value,
       baseline: Math.round((value / factor) * 10) / 10,
@@ -64,7 +64,7 @@ function peakWindow(series: HarmonizedDataPoint[]) {
     point.baseline_mean > best.baseline_mean ? point : best,
   )
   const month = new Date(`${peak.week_start}T00:00:00Z`).getUTCMonth()
-  return `${MONTHS[month]} · semana ${peak.iso_week}`
+  return `${MONTHS[month]} · week ${peak.iso_week}`
 }
 
 export function ForecastChart({
@@ -90,19 +90,19 @@ export function ForecastChart({
         </div>
         <dl className="grid grid-cols-3 gap-3 text-right">
           <div>
-            <dt className="font-mono text-[10px] tracking-wide text-[#9bb0d1] uppercase">Desvio recente</dt>
+            <dt className="font-mono text-[10px] tracking-wide text-[#9bb0d1] uppercase">Recent departure</dt>
             <dd className="text-sm text-[#ffb0a1]">
               {sign}
               {forecast.recent_anomaly_pct}%
             </dd>
           </div>
           <div>
-            <dt className="font-mono text-[10px] tracking-wide text-[#9bb0d1] uppercase">Pico local</dt>
+            <dt className="font-mono text-[10px] tracking-wide text-[#9bb0d1] uppercase">Local peak</dt>
             <dd className="text-sm text-white">{peakWindow(series)}</dd>
           </div>
           <div>
             <dt className="font-mono text-[10px] tracking-wide text-[#9bb0d1] uppercase">Backtest MAE</dt>
-            <dd className="text-sm text-[#c5d9ff]">−68,2%</dd>
+            <dd className="text-sm text-[#c5d9ff]">−68.2%</dd>
           </div>
         </dl>
       </div>
@@ -118,7 +118,7 @@ export function ForecastChart({
             <Line
               type="monotone"
               dataKey="baseline"
-              name="Climatologia"
+              name="Climatology"
               stroke="#9bb0d1"
               strokeDasharray="2 4"
               dot={false}
@@ -127,7 +127,7 @@ export function ForecastChart({
             <Line
               type="monotone"
               dataKey="observed"
-              name="Observado"
+              name="Observed"
               stroke="#fc3d21"
               strokeWidth={2.4}
               dot={{ r: 2, fill: '#fc3d21' }}
@@ -135,7 +135,7 @@ export function ForecastChart({
             <Line
               type="monotone"
               dataKey="forecast"
-              name="Previsão"
+              name="Forecast"
               stroke="#ffd4cc"
               strokeDasharray="5 4"
               strokeWidth={2}
@@ -146,7 +146,7 @@ export function ForecastChart({
         </ResponsiveContainer>
       </div>
       <p className="mt-1 text-[11px] text-[#9bb0d1]">
-        Projeção estatística da memória sazonal local e da anomalia recente. Não substitui modelo meteorológico de ignição.
+        Statistical projection from the local seasonal memory and the recent anomaly. It does not replace a meteorological ignition model.
       </p>
     </div>
   )

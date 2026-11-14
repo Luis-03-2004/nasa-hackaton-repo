@@ -18,10 +18,10 @@ export function ChartTooltip({ active, payload, label }: TooltipContentProps) {
         ))}
       </ul>
       {typeof row?.anomaly_pct === 'number' ? (
-        <p className="mt-1 text-[#ffb0a1]">Anomalia {row.anomaly_pct}%</p>
+        <p className="mt-1 text-[#ffb0a1]">Anomaly {row.anomaly_pct}%</p>
       ) : null}
       <p className="mt-2 text-[10px] leading-snug text-[#9bb0d1]">
-        Contagem de pixels FIRMS. Um pixel não é um incêndio único nem confirma fogo sob nuvem.
+        FIRMS pixel counts. A pixel is not a single fire and does not confirm fire under cloud.
       </p>
     </div>
   )

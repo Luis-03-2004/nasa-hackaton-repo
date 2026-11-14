@@ -6,7 +6,7 @@ export async function fetchFireCatalog(signal?: AbortSignal): Promise<FireDataCa
   const response = await fetch(MOCK_URL, { signal })
 
   if (!response.ok) {
-    throw new Error(`Não foi possível carregar a série harmonizada (${response.status}).`)
+    throw new Error(`Could not load the harmonized series (${response.status}).`)
   }
 
   return (await response.json()) as FireDataCatalog

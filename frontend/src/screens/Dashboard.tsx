@@ -25,7 +25,7 @@ function ChartStatus({
           onClick={onRetry}
           className="rounded-full border border-white/15 px-3 py-1 text-sm text-white"
         >
-          Tentar de novo
+          Try again
         </button>
       ) : null}
     </div>
@@ -64,7 +64,7 @@ export function Dashboard() {
       lonValue <= 180
 
     if (!valid) {
-      setGpsMessage('Use latitude entre -90 e 90 e longitude entre -180 e 180.')
+      setGpsMessage('Use a latitude between -90 and 90 and a longitude between -180 and 180.')
       return
     }
 
@@ -76,7 +76,7 @@ export function Dashboard() {
 
   function locateUser() {
     if (!navigator.geolocation) {
-      setGpsMessage('GPS indisponível neste navegador.')
+      setGpsMessage('Geolocation is not available in this browser.')
       return
     }
 
@@ -84,7 +84,7 @@ export function Dashboard() {
       (position) => {
         selectRegion(nearestHotspot(position.coords.latitude, position.coords.longitude).id)
       },
-      () => setGpsMessage('Não foi possível ler a localização.'),
+      () => setGpsMessage('Could not read your location.'),
     )
   }
 
@@ -117,7 +117,7 @@ export function Dashboard() {
         onDownload={downloadCsv}
       />
       <main className="grid min-h-0 flex-1 grid-cols-1 gap-3 p-3 lg:grid-cols-2 lg:grid-rows-2">
-        <Panel eyebrow="01 · Globo" title={region?.region_name ?? 'Atividade de queima no planeta'}>
+        <Panel eyebrow="01 · Globe" title={region?.region_name ?? 'Burning activity across the planet'}>
           <EarthGlobe
             hotspots={hotspots}
             focus={focus}
@@ -127,10 +127,10 @@ export function Dashboard() {
             onHotspotSelect={selectRegion}
           />
         </Panel>
-        <Panel eyebrow="02 · Previsão" title="Horizonte local de 4 semanas">
+        <Panel eyebrow="02 · Forecast" title="Local 4-week outlook">
           {waiting || !region ? (
             <ChartStatus
-              message={status === 'error' ? (error ?? 'Falha ao carregar.') : 'Carregando série harmonizada…'}
+              message={status === 'error' ? (error ?? 'Failed to load.') : 'Loading the harmonized series…'}
               onRetry={status === 'error' ? reload : undefined}
             />
           ) : (
@@ -141,16 +141,16 @@ export function Dashboard() {
             />
           )}
         </Panel>
-        <Panel eyebrow="03 · Calendário" title={region ? `${region.region_name} · 2020–2025` : '2020–2025'}>
+        <Panel eyebrow="03 · Calendar" title={region ? `${region.region_name} · 2020–2025` : '2020–2025'}>
           {waiting || !region ? (
-            <ChartStatus message={status === 'error' ? 'Série indisponível.' : 'Carregando calendário…'} />
+            <ChartStatus message={status === 'error' ? 'Series unavailable.' : 'Loading the calendar…'} />
           ) : (
             <Heatmap series={region.historical_series} />
           )}
         </Panel>
-        <Panel eyebrow="04 · Série" title="Histórico harmonizado e sensores">
+        <Panel eyebrow="04 · Series" title="Harmonized history and sensors">
           {waiting || !region ? (
-            <ChartStatus message={status === 'error' ? 'Série indisponível.' : 'Carregando histórico…'} />
+            <ChartStatus message={status === 'error' ? 'Series unavailable.' : 'Loading the history…'} />
           ) : (
             <SeriesChart series={region.historical_series} mode={metric} />
           )}

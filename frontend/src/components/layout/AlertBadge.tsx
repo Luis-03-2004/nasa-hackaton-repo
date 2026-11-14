@@ -9,18 +9,18 @@ const LEVELS: Record<
     dot: 'bg-[#6ea2ff]',
     chip: 'border-[#6ea2ff]/40 bg-[#0b3d91]/40 text-[#d6e6ff]',
   },
-  ATENCAO: {
-    label: 'Atenção',
+  WATCH: {
+    label: 'Watch',
     dot: 'bg-white',
     chip: 'border-white/40 bg-white/10 text-white',
   },
-  ALERTA_ALTO: {
-    label: 'Alerta alto',
+  HIGH_ALERT: {
+    label: 'High alert',
     dot: 'bg-[#fc3d21]',
     chip: 'border-[#fc3d21]/60 bg-[#fc3d21]/15 text-[#ffd4cc]',
   },
-  CRITICO: {
-    label: 'Janela crítica',
+  CRITICAL: {
+    label: 'Critical window',
     dot: 'bg-white',
     chip: 'border-[#fc3d21] bg-[#fc3d21] text-white',
   },

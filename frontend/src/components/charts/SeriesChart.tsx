@@ -46,7 +46,7 @@ export function SeriesChart({
                 <Line
                   type="monotone"
                   dataKey="harmonized_index"
-                  name="Índice harmonizado"
+                  name="Harmonized index"
                   stroke="#fc3d21"
                   dot={false}
                   strokeWidth={2}
@@ -54,7 +54,7 @@ export function SeriesChart({
                 <Line
                   type="monotone"
                   dataKey="baseline_mean"
-                  name="Média da época"
+                  name="Seasonal mean"
                   stroke="#6ea2ff"
                   dot={false}
                   strokeDasharray="4 4"
@@ -83,7 +83,7 @@ export function SeriesChart({
         </ResponsiveContainer>
       </div>
       <p className="mt-1 text-[11px] text-[#9bb0d1]">
-        Pixel não é um incêndio único. FRP é potência instantânea, em MW. Crédito: NASA FIRMS / CONAE.
+        A pixel is not a single fire. FRP is instantaneous power, in MW. Credit: NASA FIRMS / CONAE.
       </p>
     </div>
   )

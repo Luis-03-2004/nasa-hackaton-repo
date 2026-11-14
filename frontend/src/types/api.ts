@@ -12,7 +12,7 @@ export interface HarmonizedDataPoint {
 
 export interface LocalForecast {
   cell_id: string
-  alert_level: 'NORMAL' | 'ATENCAO' | 'ALERTA_ALTO' | 'CRITICO'
+  alert_level: 'NORMAL' | 'WATCH' | 'HIGH_ALERT' | 'CRITICAL'
   recent_anomaly_pct: number
   forecast_w1: number
   forecast_w2: number

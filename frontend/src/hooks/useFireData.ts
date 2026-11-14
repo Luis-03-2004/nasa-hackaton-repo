@@ -23,7 +23,7 @@ export function useFireData() {
         if (controller.signal.aborted) return
         setCatalog(null)
         setStatus('error')
-        setError(reason instanceof Error ? reason.message : 'Falha ao carregar os dados.')
+        setError(reason instanceof Error ? reason.message : 'Failed to load the data.')
       })
 
     return () => controller.abort()

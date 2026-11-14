@@ -1,8 +1,8 @@
 import { Download, LocateFixed } from 'lucide-react'
 
 const CHIPS = [
-  { id: 'world', label: '🌎 Mundo inteiro' },
-  { id: 'brasil', label: '🇧🇷 Brasil' },
+  { id: 'world', label: '🌎 Entire world' },
+  { id: 'brasil', label: '🇧🇷 Brazil' },
   { id: 'cerrado', label: '🔥 Cerrado' },
   { id: 'pantanal', label: '🐊 Pantanal' },
 ] as const
@@ -108,7 +108,7 @@ export function Header({
             className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-1.5 text-sm text-[#d6e2f5] hover:border-[#6ea2ff]/50"
           >
             <LocateFixed size={15} />
-            Meu GPS
+            My location
           </button>
           <button
             type="button"
@@ -117,27 +117,27 @@ export function Header({
             className="inline-flex items-center gap-2 rounded-lg bg-[#fc3d21] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
           >
             <Download size={15} />
-            Baixar CSV
+            Download CSV
           </button>
         </div>
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
-        <p className="font-mono text-xs text-[#9bb0d1]">Período 2020–2025</p>
+        <p className="font-mono text-xs text-[#9bb0d1]">Period 2020–2025</p>
         <div className="flex rounded-full border border-white/10 p-0.5">
           <button
             type="button"
             onClick={() => onMetricChange('harmonized')}
             className={`rounded-full px-3 py-1 ${metric === 'harmonized' ? 'bg-white/10 text-white' : 'text-[#9bb0d1]'}`}
           >
-            Índice harmonizado
+            Harmonized index
           </button>
           <button
             type="button"
             onClick={() => onMetricChange('sensors')}
             className={`rounded-full px-3 py-1 ${metric === 'sensors' ? 'bg-white/10 text-white' : 'text-[#9bb0d1]'}`}
           >
-            Comparar sensores
+            Compare sensors
           </button>
         </div>
         <p
@@ -147,7 +147,7 @@ export function Header({
               : 'border-white/10 text-[#9bb0d1]'
           }`}
         >
-          {calibrated ? 'Calibração regional · grade 0,25° / 10 km' : 'Padrão global · grade 0,5°'}
+          {calibrated ? 'Regional calibration · 0.25° / 10 km grid' : 'Global standard · 0.5° grid'}
         </p>
         {gpsMessage ? <p className="text-[#ffb0a1]">{gpsMessage}</p> : null}
       </div>
