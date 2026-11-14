@@ -3,6 +3,16 @@ import { Canvas } from '@react-three/fiber'
 import { Suspense, useLayoutEffect } from 'react'
 import { SRGBColorSpace } from 'three'
 import earthMap from '../../assets/earth-map.webp'
+import { HotspotMarker, type Hotspot } from './HotspotMarker'
+
+const MOCK_HOTSPOTS: Hotspot[] = [
+  { id: 'cerrado', lat: -12, lon: -46, color: '#ff4d2e' },
+  { id: 'amazonia', lat: -5.2, lon: -60.5, color: '#ff8a3d' },
+  { id: 'pantanal', lat: -17.5, lon: -57.2, color: '#ffb020' },
+  { id: 'california', lat: 37.5, lon: -120.5, color: '#ffd166' },
+  { id: 'angola', lat: -12.5, lon: 18.5, color: '#ff5a36' },
+  { id: 'australia', lat: -25.5, lon: 134, color: '#ff7a45' },
+]
 
 function EarthSphere() {
   const texture = useTexture(earthMap)
@@ -31,6 +41,9 @@ export function EarthGlobe() {
         <Suspense fallback={null}>
           <EarthSphere />
         </Suspense>
+        {MOCK_HOTSPOTS.map((hotspot) => (
+          <HotspotMarker key={hotspot.id} {...hotspot} />
+        ))}
         <OrbitControls
           enablePan={false}
           enableDamping
