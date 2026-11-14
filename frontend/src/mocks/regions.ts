@@ -1,3 +1,4 @@
+// Generator for public/mocks/fire-data.json. The dashboard reads that file.
 import type { FireDataResponse, HarmonizedDataPoint, LocalForecast } from '../types/api'
 
 export interface RegionDataset extends FireDataResponse {

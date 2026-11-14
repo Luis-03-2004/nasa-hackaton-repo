@@ -1,0 +1,39 @@
+import { useEffect, useState } from 'react'
+import { fetchFireCatalog } from '../services/fireApi'
+import type { FireDataCatalog } from '../types/api'
+
+type Status = 'loading' | 'ready' | 'error'
+
+export function useFireData() {
+  const [catalog, setCatalog] = useState<FireDataCatalog | null>(null)
+  const [status, setStatus] = useState<Status>('loading')
+  const [error, setError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    setStatus('loading')
+
+    fetchFireCatalog(controller.signal)
+      .then((data) => {
+        setCatalog(data)
+        setStatus('ready')
+        setError(null)
+      })
+      .catch((reason: unknown) => {
+        if (controller.signal.aborted) return
+        setCatalog(null)
+        setStatus('error')
+        setError(reason instanceof Error ? reason.message : 'Falha ao carregar os dados.')
+      })
+
+    return () => controller.abort()
+  }, [attempt])
+
+  return {
+    catalog,
+    status,
+    error,
+    reload: () => setAttempt((value) => value + 1),
+  }
+}
