@@ -1,6 +1,5 @@
 import os
 import re
-from datetime import date
 from pathlib import Path
 from typing import Iterator
 
@@ -10,6 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.engine import Connection
 
 from app.database import engine
+from app.dates import observation_week_start
 from app.models import FireObservation
 
 
@@ -98,7 +98,7 @@ def records_from_batch(
             source_row_index,
             month,
             iso_week,
-            date.fromisocalendar(year, iso_week, 1),
+            observation_week_start(year, month, iso_week),
             *row[3:8],
             lat_1km / 100,
             lon_1km / 100,

@@ -1,5 +1,11 @@
 from contextlib import asynccontextmanager
-from datetime import date, datetime, timezone
+import os
+from itertools import islice
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+from app import forecast, local_observations
+from app.database import STORAGE
+from datetime import date
 from collections.abc import Iterator
 from typing import Annotated
 
@@ -17,19 +23,24 @@ from app.schemas import (
     AreaQuery,
     AreaResponse,
     FirePointRead,
+    InferenceQuery,
 )
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    Base.metadata.create_all(bind=engine)
+    if STORAGE == "sql":
+        Base.metadata.create_all(bind=engine)
+    elif STORAGE != "parquet":
+        raise ValueError("FIRE_STORAGE deve ser parquet ou sql")
+    forecast.artifacts()
     yield
 
 
 app = FastAPI(
     title="Fire Observations API",
     description=(
-        "Query 2025 MODIS and VIIRS observations by rectangular area. "
+        "Query 2000–2025 MODIS and VIIRS observations by rectangular area. "
         "The source data is aggregated by 1 km cell and ISO week."
     ),
     version="1.0.0",
@@ -42,24 +53,10 @@ def query_date_range(
     start_date: date | None,
     end_date: date | None,
 ) -> tuple[date, date]:
-    today = datetime.now(timezone.utc).date()
-    try:
-        earliest = today.replace(year=today.year - 5)
-    except ValueError:
-        earliest = today.replace(year=today.year - 5, day=28)
-
-    start = start_date or earliest
-    end = end_date or today
-    if start < earliest:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=f"start_date cannot be earlier than {earliest.isoformat()}",
-        )
-    if end > today:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=f"end_date cannot be later than {today.isoformat()}",
-        )
+    start = start_date or date(2025, 1, 1)
+    end = end_date or date(2025, 12, 31)
+    if start < date(2000, 1, 1) or end > date(2025, 12, 31):
+        raise HTTPException(422, "O recorte disponível é 2000–2025")
     if start > end:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -109,7 +106,7 @@ def stream_hotspots(
     description=(
         "Returns all matching satellite observations as a streamed JSON array. "
         "When all four rectangle coordinates are omitted, queries the whole world. "
-        "The default date range is the last five years."
+        "The default date range is 2025; local results are limited."
     ),
 )
 def list_hotspots(
@@ -131,12 +128,13 @@ def list_hotspots(
     ] = None,
     start_date: Annotated[
         date | None,
-        Query(description="Inclusive start date; defaults to five years ago."),
+        Query(description="Inclusive start date; defaults to 2025-01-01."),
     ] = None,
     end_date: Annotated[
         date | None,
-        Query(description="Inclusive end date; defaults to today."),
+        Query(description="Inclusive end date; defaults to 2025-12-31."),
     ] = None,
+    limit: Annotated[int, Query(ge=1, le=10000)] = 1000,
 ) -> StreamingResponse:
     coordinates = (top_left_lat, top_left_lon, bottom_right_lat, bottom_right_lon)
     area = None
@@ -157,6 +155,16 @@ def list_hotspots(
         validate_area(area)
 
     start, end = query_date_range(start_date, end_date)
+    if STORAGE == "parquet":
+        local_observations.validate_local_window(area, start, end)
+        def local_stream():
+            yield b"["
+            for index, row in enumerate(islice(local_observations.iter_observations(area, start, end), limit)):
+                if index:
+                    yield b","
+                yield FirePointRead.model_validate(row).model_dump_json().encode()
+            yield b"]"
+        return StreamingResponse(local_stream(), media_type="application/json", headers={"X-Result-Limit": str(limit)})
     filters = observation_filters(area, start, end)
     return StreamingResponse(
         stream_hotspots(filters),
@@ -173,10 +181,14 @@ def list_hotspots(
 def get_area_observations(
     area: Annotated[AreaQuery, Depends()],
     db: DatabaseSession,
+    limit: Annotated[int, Query(ge=1, le=10000)] = 1000,
 ) -> AreaResponse:
     validate_area(area)
     start_date, end_date = query_date_range(area.start_date, area.end_date)
     filters = observation_filters(area, start_date, end_date)
+    if STORAGE == "parquet":
+        features, points, truncated = local_observations.scan_area(area, start_date, end_date, limit)
+        return AreaResponse(features=features, points=[FirePointRead.model_validate(row) for row in points], truncated=truncated, limit=limit)
     points = db.scalars(
         select(FireObservation)
         .where(*filters)
@@ -201,4 +213,45 @@ def get_area_features(
 ) -> AreaFeatures:
     validate_area(area)
     start_date, end_date = query_date_range(area.start_date, area.end_date)
+    if STORAGE == "parquet":
+        return AreaFeatures.model_validate(local_observations.area_features(area, start_date, end_date))
     return FeatureExtractor(db).extract(area, start_date, end_date)
+
+
+app.add_middleware(CORSMiddleware, allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(","), allow_credentials=False, allow_methods=["GET", "POST"], allow_headers=["*"])
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+
+@app.get("/health")
+def health():
+    _, model, points, _ = forecast.artifacts()
+    return {"status": "ok", "storage": STORAGE, "world_points": len(points), "data_years": [2000, 2025], "generated_at": model["generated_at"]}
+
+
+@app.get("/catalog")
+def get_catalog():
+    return forecast.catalog()
+
+
+@app.get("/world-points")
+def get_world_points():
+    return {"points": forecast.artifacts()[2], "provenance": forecast.SNAPSHOT_PROVENANCE}
+
+
+@app.get("/forecast/location")
+def get_location_forecast(lat: Annotated[float, Query(ge=-90, le=90)], lon: Annotated[float, Query(ge=-180, le=180)]):
+    return forecast.location_forecast(lat, lon)
+
+
+@app.post("/forecast/infer")
+def infer_forecast(query: InferenceQuery):
+    if query.scope not in forecast.NAMES:
+        raise HTTPException(422, "Escopo desconhecido")
+    return forecast.infer(query.scope, query.horizon, query.mu_target, query.obs_t.model_dump(), query.obs_tm1.model_dump(), query.mu_t, query.mu_tm1)
+
+
+@app.get("/observations/region-series")
+def get_region_series(region: str = "brazil", year: Annotated[int, Query(ge=2000, le=2025)] = 2025):
+    if region not in ("global", "brazil"):
+        raise HTTPException(422, "A comparação por sensor está disponível para global e brazil")
+    return local_observations.region_series(region, year)

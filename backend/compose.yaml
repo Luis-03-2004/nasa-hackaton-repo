@@ -20,6 +20,8 @@ services:
   api:
     build: .
     environment:
+      FIRE_STORAGE: sql
+      FIRE_DATA_DIR: /derived
       PARQUET_DATA_DIR: /data
       FIRE_DATA_YEARS: ${FIRE_DATA_YEARS:-2025}
       DATABASE_URL: postgresql+psycopg://hotspots:hotspots@db:5432/hotspots
@@ -27,6 +29,7 @@ services:
       - "8000:8000"
     volumes:
       - ./data:/data:ro
+      - ../../data/global_1km_2000_2025:/derived:ro
     depends_on:
       db:
         condition: service_healthy

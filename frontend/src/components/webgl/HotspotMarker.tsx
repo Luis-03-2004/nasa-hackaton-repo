@@ -20,12 +20,13 @@ export function HotspotTooltip({ hotspot }: { hotspot: Hotspot }) {
   )
 
   return (
-    <Html position={position} center zIndexRange={[30, 0]} style={{ pointerEvents: 'none' }}>
+    <Html position={position} center occlude zIndexRange={[30, 0]} style={{ pointerEvents: 'none' }}>
       <div className="w-44 rounded-lg border border-white/10 bg-[#071a3d]/95 p-2 text-left shadow-xl">
         <p className="text-sm font-semibold text-white">{hotspot.label}</p>
         <p className="mt-1 font-mono text-[10px] text-[#9bb0d1]">
           {hotspot.lat.toFixed(1)}°, {hotspot.lon.toFixed(1)}°
         </p>
+        <p className="mt-1 text-[10px] text-[#9bb0d1]">Catálogo F2 · referência 2025</p>
         <div className="mt-2">
           <AlertBadge level={hotspot.alertLevel} />
         </div>

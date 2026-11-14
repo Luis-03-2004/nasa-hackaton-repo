@@ -40,3 +40,13 @@ Todos os arquivos derivados estão prontos em `../data/global_1km_2000_2025/`:
    * Montar o componente `ForecastChart.tsx` em `screens/Dashboard.tsx` (atualmente criado mas não importado no Dashboard).
    * Ligar o botão de exportação CSV (`utils/csv.ts`) no `Header.tsx`.
    * Substituir os dados mockados em `public/mocks/fire-data.json` e `hooks/useGlobeHotspots.ts` pelas séries reais `2000–2025` e pelos pontos reais do modelo $F_2$, mantendo sincronia ao clicar em qualquer país ou ponto do Globo 3D / Mapa 2D.
+
+---
+
+## Integração local implementada — 14/11/2026
+
+O plano acima foi usado como ponto de partida. A implementação e os comandos de execução estão em [LOCAL.md](LOCAL.md) e [backend/README.md](backend/README.md). Inicie com `./iniciar_local.sh` na raiz Web.
+
+A inspeção direta corrigiu premissas do plano: os históricos exportados são mensais, o snapshot F₂ usa semanas de referência variáveis de 2025 e o gerador legado usa imputações físicas sem máscara por ponto. Não há histórico local nem intervalos exportados no catálogo. Essas condições são explícitas nos contratos e na interface; não foram inventadas séries semanais, previsões atuais ou bandas de incerteza.
+
+O modo local lê os Parquet sem PostgreSQL; o SQL continua configurável para a próxima migração. Mapas, seleção de pontos/coordenadas, calendário, histórico, CSV e consultas reais por área e sensor foram conectados à API. O tratamento de datas usa ano calendário e mês para resolver as viradas ISO, preservando semanas 53 válidas.

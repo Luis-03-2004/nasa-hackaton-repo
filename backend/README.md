@@ -1,102 +1,112 @@
-# API de observacoes de fogo
+# API local do FireCal
 
-API FastAPI com armazenamento PostgreSQL e filtros espaciais por retangulo.
-O endpoint `/docs` publica a documentacao interativa Swagger.
+Python **3.12.2**, FastAPI e PyArrow. O modo padrão consulta os artefatos
+locais em somente leitura, sem importar 295 milhões de linhas no PostgreSQL.
+Não há download nem modificação das fontes durante a inicialização.
 
-## Subir API, banco e dados
-
-Os tres arquivos MODIS, VIIRS-NOAA-20 (JPSS-1) e VIIRS-SNPP estao em
-`data/`. Cada linha e um registro agregado por celula de aproximadamente 1 km
-e semana ISO, nao uma deteccao individual com horario exato. A API preserva
-todos os campos dos Parquets; `latitude` e `longitude` sao calculadas como
-`lat_1km / 100` e `lon_1km / 100`, e `period_start` e a segunda-feira da semana
-ISO (uma data aproximada para o agregado).
-
-Na raiz deste diretorio, suba tudo com um unico comando:
+Na raiz `hackaton-nasa/`, instale com:
 
 ```bash
-docker compose up --build
+uv pip install --python .venv/bin/python -r nasa-hackaton-repo/backend/requirements.txt
 ```
 
-O Compose inicia o Postgres e, quando ele estiver pronto, a API importa os anos
-configurados antes de aceitar requisicoes. O Postgres fica na porta `5433` do
-host e a API na porta `8000`. Abra <http://localhost:8000/docs> para usar o
-Swagger.
-
-### Configurar os anos importados
-
-Por padrao, `FIRE_DATA_YEARS` e `2025`. Para escolher outros anos, copie
-`.env.example` para `.env` e ajuste a lista:
+Inicie a partir de `nasa-hackaton-repo/backend/`:
 
 ```bash
-FIRE_DATA_YEARS=2025,2024
+../../.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-Tambem e possivel definir `FIRE_DATA_YEARS` no ambiente antes de executar
-`docker compose up`. Para cada ano selecionado, a pasta `data/` precisa conter
-um ou mais arquivos Parquet com o ano no nome (por exemplo,
-`modis_2025_1km.parquet`). Se faltar algum ano configurado, a inicializacao
-falha explicitamente em vez de iniciar a API sem esses dados.
+Acesse <http://localhost:8000/docs>. `FIRE_DATA_DIR` substitui a pasta padrão
+`hackaton-nasa/data/global_1km_2000_2025/`. `PARQUET_DATA_DIR` substitui somente
+`parquet_1km/`. `CORS_ORIGINS` recebe origens separadas por vírgula; por padrão
+aceita `http://localhost:5173` e `http://127.0.0.1:5173`.
 
-A importacao e idempotente: na inicializacao, arquivos que ja estao completos
-no banco sao ignorados; cargas parciais sao retomadas. Cada linha original e
-identificada pela combinacao de satelite, ano e numero da linha no arquivo,
-preservando inclusive registros com coordenada e semana repetidas.
+## Contrato dos dados
 
-Os dados do banco permanecem no volume nomeado `nasa-fire-api_postgres_data`
-quando os containers param ou sao recriados. Os arquivos Parquet sao montados
-como somente leitura em `/data`; a importacao nao altera os originais. Nao use
-`docker compose down -v`, pois a opcao `-v` remove o volume e os dados
-persistidos.
+- `GET /health`: modo de armazenamento, cobertura e quantidade de pontos.
+- `GET /catalog`: sete escopos com 312 meses por escopo, 2000–2025. A série é
+  **mensal**, não semanal: `iso_week=0` é um marcador legado, e
+  `temporal_resolution="monthly"` informa a resolução. Os campos por sensor
+  são nulos porque não existem neste artefato. `forecast=null` porque o JSON
+  agregado contém métricas do F2, não uma previsão agregada operacional.
+- `GET /world-points`: `{points:[...]}` preserva todos os campos do catálogo
+  Parquet de 16.525 pontos; datas de referência variam por localidade.
+- `GET /forecast/location?lat=-12&lon=-46`: snapshot F2 do ponto terrestre
+  mais próximo, sua distância em km, horizontes 1–4 e anomalias. Não há série
+  histórica local neste catálogo; `historical_series=[]`. Não há intervalos
+  de previsão exportados; `band_p10_p90=null`.
+- `POST /forecast/infer`: executa os pesos F2 reais sobre seis variáveis
+  extraídas de observações explicitamente fornecidas pelo chamador. Requer
+  `scope`, `horizon`, `mu_target`, `mu_t`, `mu_tm1`, `obs_t` e `obs_tm1`.
+  Cada observação exige `h_cells`, `merged_count`, `frp_sum`, `bright_max`,
+  `bright_bg_mean` e `night_count`. Esta rota não verifica a origem das entradas.
 
-Para mudar os anos depois da primeira subida, altere `.env` e execute
-`docker compose up --build` novamente. Os anos novos serao adicionados ao
-mesmo banco; os registros existentes nao sao apagados.
+O snapshot foi produzido em 2026 com referência em semanas de **2025** e não
+representa previsão atual. O script de treinamento possui fallback de valores
+físicos quando uma semana está ausente e não grava a máscara de imputação.
+Por isso a API informa essa limitação na procedência; os drivers do catálogo
+não podem ser anunciados como medições verificadas em todos os pontos.
+Métricas por zona validam séries agregadas da zona, não cada célula do mapa.
+Zeros da série de origem foram preservados, inclusive a cobertura inicial
+parcial. Ausência de registro não comprova ausência de fogo; uma célula não
+representa um incêndio independente nem área queimada.
 
-## Consultas de hotspots
+## Observações detalhadas
 
-`GET /hotspots` retorna os pontos de fogo importados de todos os satelites.
-Quando os limites geograficos sao omitidos, a busca cobre o mundo inteiro:
+`GET /hotspots` retorna até `limit=1000` registros (máximo 10.000), por padrão
+no ano de 2025. O cabeçalho `X-Result-Limit` informa o teto da resposta local.
+O retorno é uma seleção limitada e não equivale a todos os dados do mundo.
 
-```text
-/hotspots
+`GET /observations/area` exige `top_left_lat`, `top_left_lon`,
+`bottom_right_lat` e `bottom_right_lon`. Aceita `start_date`, `end_date` e
+`limit`. Retorna pontos, `truncated`, `limit` e features calculadas sobre a
+consulta completa, não apenas sobre os pontos retornados.
+`GET /observations/area/features` retorna somente os totais completos.
+No modo local, consultas detalhadas aceitam no máximo **366 dias** e caixas
+com até **25 graus quadrados**. Use `/catalog` e `/world-points` para a visão
+global. O leitor trabalha em lotes, preservando `source_row_index` de cada
+arquivo e o nome do satélite. O `id` local é determinístico e pode diferir do
+identificador sequencial de uma futura importação SQL.
+
+As coordenadas vêm de `lat_1km / 100` e `lon_1km / 100`; os agregados usam
+uma grade angular de 0,01°, cuja dimensão física varia com a latitude.
+`period_start` é a segunda-feira aproximada da semana ISO. Como as fontes
+guardam ano calendário e mês, janeiro/52–53 usa o ano ISO anterior e
+ dezembro/1 usa o seguinte. Semanas 53 válidas são preservadas, sem fundi-las
+na semana 52. F2 e o calendário exportados seguem o filtro de 52 semanas do
+pipeline; a API não altera esse método.
+
+`GET /observations/region-series?region=brazil&year=2025` retorna 12 meses
+com células-semana de cada sensor a partir dos Parquets de 0,25° (que somam
+as células de 0,01°). Aceita `region=global` ou `region=brazil`, anos 2000–2025.
+O envelope contém `region`, `year`, `temporal_resolution`, `series` e
+`provenance`; cada mês contém `month`, `week_start`, `n_modis`,
+`n_viirs_snpp`, `n_viirs_jpss1`. Sensor sem arquivo no ano é nulo, não zero.
+As contagens não são harmonizadas ou deduplicadas entre sensores e semanas.
+A API guarda em cache até 52 combinações região/ano durante o processo.
+
+## PostgreSQL e próxima migração
+
+`FIRE_STORAGE=sql` habilita as consultas SQL existentes e a criação de tabela;
+`DATABASE_URL` configura o destino. O modo padrão `parquet` não abre conexão
+com PostgreSQL. A ingestão continua disponível via `python -m app.ingest`, com
+`FIRE_DATA_YEARS` (padrão 2025) e `PARQUET_DATA_DIR` explícitos. Não há migração
+para RDS nesta entrega.
+
+O Compose existente mantém o fluxo PostgreSQL: `docker compose up --build`.
+Ele usa `FIRE_STORAGE=sql`, importa a pasta `backend/data/` e monta os derivados
+em `/derived`. Não remova o volume persistente do banco. O fluxo SQL não foi
+executado nesta integração local; as consultas existentes foram preservadas.
+
+## Verificação
+
+Na raiz `hackaton-nasa/`, instale também as dependências de teste:
+
+```bash
+uv pip install --python .venv/bin/python -r nasa-hackaton-repo/backend/requirements-dev.txt
+PYTHONPATH=nasa-hackaton-repo/backend .venv/bin/python -m unittest discover -s nasa-hackaton-repo/backend/tests -v
 ```
 
-Opcionalmente, filtre por retangulo informando os quatro limites:
-
-- `top_left_lat` e `top_left_lon`: latitude superior e longitude esquerda.
-- `bottom_right_lat` e `bottom_right_lon`: latitude inferior e longitude direita.
-- `start_date` e `end_date` sao opcionais; sem datas, a consulta cobre os
-  ultimos cinco anos ate hoje. Datas anteriores ao limite ou futuras sao
-  rejeitadas.
-
-Os pontos sao enviados como um array JSON em streaming, sem paginação. Isso
-permite consultar o mundo todo sem carregar todos os registros na memoria da
-API. Exemplo com area e periodo:
-
-```text
-/hotspots?top_left_lat=-22&top_left_lon=-46&bottom_right_lat=-24&bottom_right_lon=-44&start_date=2025-01-01&end_date=2025-12-31
-```
-
-`GET /observations/area` retorna os pontos e os recursos calculados para uma
-area. `GET /observations/area/features` retorna somente os recursos da mesma
-consulta:
-
-```text
-/observations/area/features?top_left_lat=-22&top_left_lon=-46&bottom_right_lat=-24&bottom_right_lon=-44
-```
-
-Os recursos incluem a semana mais recente observada (`last_fire`, aproximada),
-registros e deteccoes representadas por ano (`fires_per_year`) e totais por
-satélite. `observations` conta linhas agregadas; `detections` soma
-`merged_count`. As contagens entre satelites nao sao deduplicadas.
-
-A API e somente leitura para hotspots: nao ha endpoint para cadastrar ou
-remover pontos manualmente. Os registros consultados sao os importados dos
-Parquets. A restricao de cinco anos limita as consultas, mas nao cria historico
-ausente: os arquivos atualmente disponiveis cobrem 2025.
-
-## Respostas de erro
-
-Coordenadas fora dos limites, retangulos invertidos e datas fora da janela
-permitida retornam `422`. A API cria as tabelas quando inicia.
+Os testes distinguem fixtures sintéticas dos artefatos reais: validam viradas
+ISO, identidade da linha fonte, filtro espacial, agregação, paridade matemática
+com o script de treinamento, contrato dos 16.525 pontos e CORS.

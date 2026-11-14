@@ -18,11 +18,11 @@ class AreaQuery(BaseModel):
     )
     start_date: date | None = Field(
         default=None,
-        description="Inclusive start date; defaults to five years before today.",
+        description="Inclusive approximate ISO-week start date; defaults to 2025-01-01.",
     )
     end_date: date | None = Field(
         default=None,
-        description="Inclusive end date; defaults to today.",
+        description="Inclusive approximate ISO-week start date; defaults to 2025-12-31.",
     )
 
 class FirePointRead(BaseModel):
@@ -82,5 +82,26 @@ class AreaFeatures(BaseModel):
 
 
 class AreaResponse(BaseModel):
+    truncated: bool = False
+    limit: int = 1000
     features: AreaFeatures
     points: list[FirePointRead]
+
+
+class PhysicalObservation(BaseModel):
+    h_cells: float = Field(ge=0, allow_inf_nan=False)
+    merged_count: float = Field(ge=0, allow_inf_nan=False)
+    frp_sum: float = Field(ge=0, allow_inf_nan=False)
+    bright_max: float = Field(ge=0, allow_inf_nan=False)
+    bright_bg_mean: float = Field(ge=0, allow_inf_nan=False)
+    night_count: float = Field(ge=0, allow_inf_nan=False)
+
+
+class InferenceQuery(BaseModel):
+    scope: str = "global"
+    horizon: int = Field(default=1, ge=1, le=4)
+    mu_target: float = Field(ge=0, allow_inf_nan=False)
+    mu_t: float = Field(ge=0, allow_inf_nan=False)
+    mu_tm1: float = Field(ge=0, allow_inf_nan=False)
+    obs_t: PhysicalObservation
+    obs_tm1: PhysicalObservation

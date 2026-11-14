@@ -1,5 +1,8 @@
-// Generator for public/mocks/fire-data.json. The dashboard reads that file.
-import type { FireDataResponse, HarmonizedDataPoint, LocalForecast } from '../types/api'
+// Gerador legado de demonstração sintética. O dashboard integrado não importa este módulo nem usa esses dados.
+import type { FireDataResponse as LiveResponse, HarmonizedDataPoint, LocalForecast as LiveForecast } from '../types/api'
+
+type LocalForecast = Pick<LiveForecast, 'cell_id' | 'alert_level' | 'recent_anomaly_pct' | 'forecast_w1' | 'forecast_w2' | 'forecast_w3' | 'forecast_w4' | 'band_p10_p90'>
+type FireDataResponse = Pick<LiveResponse, 'region_name' | 'coordinates' | 'calibration_status' | 'historical_series'> & { forecast: LocalForecast }
 
 export interface RegionDataset extends FireDataResponse {
   id: string

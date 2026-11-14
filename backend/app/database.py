@@ -5,6 +5,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 
+STORAGE = os.getenv("FIRE_STORAGE", "parquet")
+
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql+psycopg://hotspots:hotspots@localhost:5432/hotspots",
@@ -19,5 +21,8 @@ class Base(DeclarativeBase):
 
 
 def get_db() -> Iterator[Session]:
+    if STORAGE == "parquet":
+        yield None
+        return
     with SessionLocal() as session:
         yield session

@@ -6,21 +6,21 @@ const LEVELS: Record<
 > = {
   NORMAL: {
     label: 'Normal',
-    dot: 'bg-[#6ea2ff]',
+    dot: 'bg-emerald-400',
     chip: 'border-[#6ea2ff]/40 bg-[#0b3d91]/40 text-[#d6e6ff]',
   },
   WATCH: {
-    label: 'Watch',
+    label: 'Atenção',
     dot: 'bg-white',
     chip: 'border-white/40 bg-white/10 text-white',
   },
   HIGH_ALERT: {
-    label: 'High alert',
+    label: 'Alerta alto',
     dot: 'bg-[#fc3d21]',
     chip: 'border-[#fc3d21]/60 bg-[#fc3d21]/15 text-[#ffd4cc]',
   },
   CRITICAL: {
-    label: 'Critical window',
+    label: 'Crítico',
     dot: 'bg-white',
     chip: 'border-[#fc3d21] bg-[#fc3d21] text-white',
   },
