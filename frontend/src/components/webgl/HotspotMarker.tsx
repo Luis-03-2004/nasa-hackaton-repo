@@ -15,7 +15,15 @@ export interface Hotspot {
   alertLevel: LocalForecast['alert_level']
 }
 
-export function HotspotMarker({ lat, lon, color, label, alertLevel }: Hotspot) {
+export function HotspotMarker({
+  id,
+  lat,
+  lon,
+  color,
+  label,
+  alertLevel,
+  onSelect,
+}: Hotspot & { onSelect?: (id: string) => void }) {
   const ring = useRef<Mesh>(null)
   const [hovered, setHovered] = useState(false)
   const placement = useMemo(() => {
@@ -44,6 +52,10 @@ export function HotspotMarker({ lat, lon, color, label, alertLevel }: Hotspot) {
       onPointerOut={() => {
         setHovered(false)
         document.body.style.cursor = 'auto'
+      }}
+      onClick={(event) => {
+        event.stopPropagation()
+        onSelect?.(id)
       }}
     >
       <mesh>

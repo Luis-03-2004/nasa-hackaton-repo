@@ -11,15 +11,6 @@ export interface GlobePick {
   lon: number
 }
 
-const MOCK_HOTSPOTS: Hotspot[] = [
-  { id: 'cerrado', lat: -12, lon: -46, color: '#ff4d2e', label: 'Cerrado Central', alertLevel: 'ALERTA_ALTO' },
-  { id: 'amazonia', lat: -5.2, lon: -60.5, color: '#ff8a3d', label: 'Arco Amazônico', alertLevel: 'ATENCAO' },
-  { id: 'pantanal', lat: -17.5, lon: -57.2, color: '#ffb020', label: 'Pantanal', alertLevel: 'CRITICO' },
-  { id: 'california', lat: 37.5, lon: -120.5, color: '#ffd166', label: 'Califórnia', alertLevel: 'ATENCAO' },
-  { id: 'angola', lat: -12.5, lon: 18.5, color: '#ff5a36', label: 'Angola', alertLevel: 'ATENCAO' },
-  { id: 'australia', lat: -25.5, lon: 134, color: '#ff7a45', label: 'Austrália', alertLevel: 'NORMAL' },
-]
-
 function EarthSphere({ onPick }: { onPick: (point: Vector3) => void }) {
   const texture = useTexture(earthMap)
 
@@ -76,10 +67,14 @@ function GlobeRig({ focus, children }: { focus: GlobePick | null; children: Reac
 }
 
 export function EarthGlobe({
+  hotspots,
   onSelect,
+  onHotspotSelect,
   focus = null,
 }: {
+  hotspots: Hotspot[]
   onSelect?: (pick: GlobePick) => void
+  onHotspotSelect?: (id: string) => void
   focus?: GlobePick | null
 }) {
   const [picked, setPicked] = useState<GlobePick | null>(null)
@@ -101,8 +96,8 @@ export function EarthGlobe({
           <Suspense fallback={null}>
             <EarthSphere onPick={handlePick} />
           </Suspense>
-          {MOCK_HOTSPOTS.map((hotspot) => (
-            <HotspotMarker key={hotspot.id} {...hotspot} />
+          {hotspots.map((hotspot) => (
+            <HotspotMarker key={hotspot.id} {...hotspot} onSelect={onHotspotSelect} />
           ))}
           {aim ? <SelectionPin lat={aim.lat} lon={aim.lon} /> : null}
         </GlobeRig>
