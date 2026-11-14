@@ -1,7 +1,7 @@
 import { OrbitControls, useTexture } from '@react-three/drei'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Quaternion, SRGBColorSpace, Vector3, type Group } from 'three'
+import { LinearFilter, LinearMipmapLinearFilter, Quaternion, SRGBColorSpace, Vector3, type Group } from 'three'
 import earthMap from '../../assets/earth-map.webp'
 import { latLonToVector3, vector3ToLatLon } from '../../utils/geo'
 import { HotspotMarker, type Hotspot } from './HotspotMarker'
@@ -13,12 +13,16 @@ export interface GlobePick {
 
 function EarthSphere({ onPick }: { onPick: (point: Vector3) => void }) {
   const texture = useTexture(earthMap)
+  const gl = useThree((state) => state.gl)
 
   useLayoutEffect(() => {
     texture.colorSpace = SRGBColorSpace
-    texture.anisotropy = 8
+    texture.anisotropy = gl.capabilities.getMaxAnisotropy()
+    texture.minFilter = LinearMipmapLinearFilter
+    texture.magFilter = LinearFilter
+    texture.generateMipmaps = true
     texture.needsUpdate = true
-  }, [texture])
+  }, [texture, gl])
 
   return (
     <mesh
@@ -27,7 +31,7 @@ function EarthSphere({ onPick }: { onPick: (point: Vector3) => void }) {
         onPick(event.object.worldToLocal(event.point.clone()))
       }}
     >
-      <sphereGeometry args={[1, 96, 96]} />
+      <sphereGeometry args={[1, 128, 128]} />
       <meshStandardMaterial map={texture} roughness={1} metalness={0} />
     </mesh>
   )
@@ -104,8 +108,10 @@ export function EarthGlobe({
         <OrbitControls
           enablePan={false}
           enableDamping
-          minDistance={1.5}
-          maxDistance={6}
+          rotateSpeed={0.28}
+          zoomSpeed={0.4}
+          minDistance={1.12}
+          maxDistance={8}
         />
       </Canvas>
       {aim ? (
