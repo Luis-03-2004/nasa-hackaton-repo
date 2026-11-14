@@ -1,9 +1,5 @@
-import { EarthGlobe } from './components/webgl/EarthGlobe'
+import { Dashboard } from './screens/Dashboard'
 
 export default function App() {
-  return (
-    <main className="h-full w-full">
-      <EarthGlobe />
-    </main>
-  )
+  return <Dashboard />
 }

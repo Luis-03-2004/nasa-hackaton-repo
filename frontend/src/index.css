@@ -1,9 +1,27 @@
 @import 'tailwindcss';
 
+@theme {
+  --font-sans: 'Barlow', 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+
 html,
 body,
 #root {
   height: 100%;
   margin: 0;
-  background: #0b0f17;
+}
+
+body {
+  background:
+    radial-gradient(900px 420px at 8% -10%, rgba(255, 106, 44, 0.16), transparent 55%),
+    radial-gradient(720px 480px at 100% 0%, rgba(61, 214, 245, 0.09), transparent 46%),
+    #0b0f17;
+  color: #e8eef7;
+  font-family: var(--font-sans);
+}
+
+button,
+input {
+  font: inherit;
 }
