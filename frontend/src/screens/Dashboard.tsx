@@ -1,13 +1,14 @@
-import { useState } from 'react'
-import { ForecastChart } from '../components/charts/ForecastChart'
+import { useEffect, useState } from 'react'
 import { Heatmap } from '../components/charts/Heatmap'
 import { SeriesChart } from '../components/charts/SeriesChart'
-import { Header, type SeriesMetric } from '../components/layout/Header'
+import { AlertBadge } from '../components/layout/AlertBadge'
+import { Header, type MapView, type SeriesMetric } from '../components/layout/Header'
 import { Panel } from '../components/layout/Panel'
-import { EarthGlobe } from '../components/webgl/EarthGlobe'
+import { EarthGlobe, type GlobePick } from '../components/webgl/EarthGlobe'
+import { FlatMap } from '../components/webgl/FlatMap'
 import { useFireData } from '../hooks/useFireData'
-import { nearestHotspot, useGlobeHotspots } from '../hooks/useGlobeHotspots'
-import { downloadSeriesCsv } from '../utils/csv'
+import { GLOBE_HOTSPOTS, useGlobeHotspots } from '../hooks/useGlobeHotspots'
+import { countryAt, loadCountries, type CountryShape } from '../utils/countries'
 
 function ChartStatus({
   message,
@@ -36,126 +37,163 @@ export function Dashboard() {
   const { catalog, status, error, reload } = useFireData()
   const { hotspots } = useGlobeHotspots()
   const [regionId, setRegionId] = useState('cerrado')
-  const [latDraft, setLatDraft] = useState<string | null>(null)
-  const [lonDraft, setLonDraft] = useState<string | null>(null)
+  const [view, setView] = useState<MapView>('3d')
+  const [date, setDate] = useState('')
+  const [forecastText, setForecastText] = useState('')
   const [metric, setMetric] = useState<SeriesMetric>('harmonized')
-  const [gpsMessage, setGpsMessage] = useState<string | null>(null)
+  const [countries, setCountries] = useState<CountryShape[]>([])
+  const [country, setCountry] = useState<string | null>(null)
+  const [picked, setPicked] = useState<GlobePick | null>(null)
+
+  useEffect(() => {
+    let active = true
+    loadCountries()
+      .then((loaded) => {
+        if (active) setCountries(loaded)
+      })
+      .catch(() => {
+        if (active) setCountries([])
+      })
+    return () => {
+      active = false
+    }
+  }, [])
 
   const region = catalog?.regions.find((item) => item.id === regionId) ?? null
-  const lat = latDraft ?? (region ? region.coordinates.lat_center.toFixed(2) : '-12.00')
-  const lon = lonDraft ?? (region ? region.coordinates.lon_center.toFixed(2) : '-46.00')
-
-  function selectRegion(id: string) {
-    setRegionId(id)
-    setLatDraft(null)
-    setLonDraft(null)
-    setGpsMessage(null)
-  }
-
-  function applyCoordinates() {
-    const latValue = Number(lat)
-    const lonValue = Number(lon)
-    const valid =
-      Number.isFinite(latValue) &&
-      Number.isFinite(lonValue) &&
-      latValue >= -90 &&
-      latValue <= 90 &&
-      lonValue >= -180 &&
-      lonValue <= 180
-
-    if (!valid) {
-      setGpsMessage('Use a latitude between -90 and 90 and a longitude between -180 and 180.')
-      return
-    }
-
-    setGpsMessage(null)
-    setLatDraft(null)
-    setLonDraft(null)
-    setRegionId(nearestHotspot(latValue, lonValue).id)
-  }
-
-  function locateUser() {
-    if (!navigator.geolocation) {
-      setGpsMessage('Geolocation is not available in this browser.')
-      return
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        selectRegion(nearestHotspot(position.coords.latitude, position.coords.longitude).id)
-      },
-      () => setGpsMessage('Could not read your location.'),
-    )
-  }
-
-  function downloadCsv() {
-    if (!region) return
-    downloadSeriesCsv(`firecal-${regionId}.csv`, region.historical_series)
-  }
-
+  const hotspot = GLOBE_HOTSPOTS.find((item) => item.id === regionId) ?? null
+  const monthKey = date.slice(0, 7)
+  const series =
+    region == null
+      ? []
+      : monthKey
+        ? region.historical_series.filter((point) => point.week_start.startsWith(monthKey))
+        : region.historical_series
   const waiting = status !== 'ready' || !region
-  const focus = region
-    ? { lat: region.coordinates.lat_center, lon: region.coordinates.lon_center }
-    : null
+  const focus = picked ?? (hotspot ? { lat: hotspot.lat, lon: hotspot.lon } : null)
+
+  function selectHotspot(id: string) {
+    const next = GLOBE_HOTSPOTS.find((item) => item.id === id)
+    setRegionId(id)
+    if (!next) return
+    setPicked({ lat: next.lat, lon: next.lon })
+    setCountry(countryAt(countries, next.lat, next.lon))
+  }
+
+  function selectPlace(pick: GlobePick) {
+    setPicked(pick)
+    setCountry(countryAt(countries, pick.lat, pick.lon))
+  }
 
   return (
-    <div className="flex h-full min-h-screen flex-col">
-      <Header
-        regionId={regionId}
-        lat={lat}
-        lon={lon}
-        metric={metric}
-        calibrated={region?.calibration_status === 'calibrated_local'}
-        gpsMessage={gpsMessage}
-        downloadEnabled={Boolean(region)}
-        onRegionChange={selectRegion}
-        onLatChange={setLatDraft}
-        onLonChange={setLonDraft}
-        onApplyCoordinates={applyCoordinates}
-        onLocate={locateUser}
-        onMetricChange={setMetric}
-        onDownload={downloadCsv}
-      />
-      <main className="grid min-h-0 flex-1 grid-cols-1 gap-3 p-3 lg:grid-cols-2 lg:grid-rows-2">
-        <Panel eyebrow="01 · Globe" title={region?.region_name ?? 'Burning activity across the planet'}>
+    <div className="grid h-full min-h-0 grid-cols-1 lg:grid-cols-3">
+      <section className="relative h-[68vh] min-h-0 lg:col-span-2 lg:h-full">
+        {view === '3d' ? (
           <EarthGlobe
             hotspots={hotspots}
             focus={focus}
-            onSelect={({ lat: pickedLat, lon: pickedLon }) => {
-              selectRegion(nearestHotspot(pickedLat, pickedLon).id)
-            }}
-            onHotspotSelect={selectRegion}
+            onSelect={selectPlace}
+            onHotspotSelect={selectHotspot}
           />
-        </Panel>
-        <Panel eyebrow="02 · Forecast" title="Local 4-week outlook">
+        ) : null}
+        {view === '2d' ? (
+          <FlatMap
+            hotspots={hotspots}
+            countries={countries}
+            selectedId={regionId}
+            onPick={selectPlace}
+            onHotspotSelect={selectHotspot}
+          />
+        ) : null}
+        {view === 'heat' ? (
+          <div className="h-full bg-[#071a3a] p-4">
+            {waiting || !region ? (
+              <ChartStatus
+                message={status === 'error' ? (error ?? 'Failed to load.') : 'Loading the heat map…'}
+                onRetry={status === 'error' ? reload : undefined}
+              />
+            ) : series.length === 0 ? (
+              <ChartStatus message="No records for this date." />
+            ) : (
+              <Heatmap series={series} />
+            )}
+          </div>
+        ) : null}
+
+        {country ? (
+          <div className="pointer-events-none absolute top-4 left-4 rounded-xl border border-white/10 bg-[#071a3d]/90 px-4 py-3">
+            <p className="font-mono text-[10px] tracking-[0.16em] text-[#9bb0d1] uppercase">Country</p>
+            <p className="text-2xl font-semibold text-white">{country}</p>
+          </div>
+        ) : null}
+
+        {hotspot ? (
+          <button
+            type="button"
+            onClick={() => selectHotspot(hotspot.id)}
+            className="absolute bottom-4 left-4 w-64 rounded-xl border border-white/10 bg-[#071a3d]/95 p-3 text-left shadow-xl"
+          >
+            <p className="text-sm font-semibold text-white">{hotspot.label}</p>
+            <p className="mt-1 font-mono text-[10px] text-[#9bb0d1]">
+              {hotspot.lat.toFixed(1)}°, {hotspot.lon.toFixed(1)}°
+            </p>
+            <div className="mt-2">
+              <AlertBadge level={hotspot.alertLevel} />
+            </div>
+            {region ? (
+              <p className="mt-2 text-xs text-[#d6e2f5]">
+                Recent departure {region.forecast.recent_anomaly_pct > 0 ? '+' : ''}
+                {region.forecast.recent_anomaly_pct.toFixed(0)}%
+              </p>
+            ) : null}
+          </button>
+        ) : null}
+      </section>
+
+      <aside className="flex min-h-0 flex-col gap-3 overflow-y-auto border-white/10 bg-[#04122b] p-3 lg:border-l">
+        <Header
+          view={view}
+          date={date}
+          forecastText={forecastText}
+          onViewChange={setView}
+          onDateChange={setDate}
+          onForecastTextChange={setForecastText}
+          onForecastSubmit={() => undefined}
+        />
+        <Panel
+          className="min-h-[280px] flex-1"
+          eyebrow="Historical series"
+          title={region ? region.region_name : 'Harmonized history'}
+          action={
+            <div className="flex rounded-full border border-white/10 p-0.5 text-[11px]">
+              <button
+                type="button"
+                onClick={() => setMetric('harmonized')}
+                className={`rounded-full px-2 py-1 ${metric === 'harmonized' ? 'bg-white/10 text-white' : 'text-[#9bb0d1]'}`}
+              >
+                Index
+              </button>
+              <button
+                type="button"
+                onClick={() => setMetric('sensors')}
+                className={`rounded-full px-2 py-1 ${metric === 'sensors' ? 'bg-white/10 text-white' : 'text-[#9bb0d1]'}`}
+              >
+                Sensors
+              </button>
+            </div>
+          }
+        >
           {waiting || !region ? (
             <ChartStatus
-              message={status === 'error' ? (error ?? 'Failed to load.') : 'Loading the harmonized series…'}
+              message={status === 'error' ? (error ?? 'Failed to load.') : 'Loading the history…'}
               onRetry={status === 'error' ? reload : undefined}
             />
+          ) : series.length === 0 ? (
+            <ChartStatus message="No records for this date." />
           ) : (
-            <ForecastChart
-              series={region.historical_series}
-              forecast={region.forecast}
-              regionName={region.region_name}
-            />
+            <SeriesChart series={series} mode={metric} />
           )}
         </Panel>
-        <Panel eyebrow="03 · Calendar" title={region ? `${region.region_name} · 2020–2025` : '2020–2025'}>
-          {waiting || !region ? (
-            <ChartStatus message={status === 'error' ? 'Series unavailable.' : 'Loading the calendar…'} />
-          ) : (
-            <Heatmap series={region.historical_series} />
-          )}
-        </Panel>
-        <Panel eyebrow="04 · Series" title="Harmonized history and sensors">
-          {waiting || !region ? (
-            <ChartStatus message={status === 'error' ? 'Series unavailable.' : 'Loading the history…'} />
-          ) : (
-            <SeriesChart series={region.historical_series} mode={metric} />
-          )}
-        </Panel>
-      </main>
+      </aside>
     </div>
   )
 }

@@ -22,14 +22,11 @@ export interface GlobePick {
 
 const EARTH_RADIUS_KM = 6371
 const KM_PER_DEG = (Math.PI / 180) * EARTH_RADIUS_KM
-const HOTSPOT_DIAMETER_KM = 4
+const HOTSPOT_DIAMETER_KM = 160
 const HOTSPOT_RADIUS_KM = HOTSPOT_DIAMETER_KM / 2
 const HOTSPOT_SLOTS = 8
 const FOV_DEG = 42
-const MIN_CAMERA_DISTANCE =
-  1 +
-  (HOTSPOT_DIAMETER_KM / EARTH_RADIUS_KM) *
-    (500 / (4 * ((FOV_DEG * Math.PI) / 180)))
+const MIN_CAMERA_DISTANCE = 1.12
 
 const HOTSPOT_UNIFORMS = /* glsl */ `
 uniform int hotspotCount;
@@ -52,8 +49,11 @@ const HOTSPOT_PAINT = /* glsl */ `
     float northKm = dLat * ${KM_PER_DEG.toFixed(5)};
     float eastKm = dLon * cosLat * ${KM_PER_DEG.toFixed(5)};
     float distKm = length(vec2(eastKm, northKm));
-    if (fwidth(distKm) < hotspotDiameterKm && distKm <= hotspotRadiusKm) {
+    if (distKm <= hotspotRadiusKm) {
       diffuseColor.rgb = hotspotColor[i];
+    } else if (distKm <= hotspotRadiusKm * 1.65) {
+      float ring = 1.0 - (distKm - hotspotRadiusKm) / (hotspotRadiusKm * 0.65);
+      diffuseColor.rgb = mix(diffuseColor.rgb, hotspotColor[i], ring);
     }
   }
 }
@@ -70,7 +70,7 @@ function distanceKm(lat: number, lon: number, hotspot: Hotspot) {
 
 function hotspotNear(hotspots: Hotspot[], lat: number, lon: number) {
   let best: Hotspot | null = null
-  let bestDistance = HOTSPOT_RADIUS_KM
+  let bestDistance = HOTSPOT_RADIUS_KM * 1.65
 
   for (const hotspot of hotspots) {
     const distance = distanceKm(lat, lon, hotspot)
@@ -178,7 +178,7 @@ function EarthSphere({
         roughness={1}
         metalness={0}
         onBeforeCompile={onBeforeCompile}
-        customProgramCacheKey={() => 'earth-hotspot-1km'}
+        customProgramCacheKey={() => 'earth-hotspot-marked'}
       />
     </mesh>
   )
