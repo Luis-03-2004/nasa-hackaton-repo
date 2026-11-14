@@ -1,7 +1,7 @@
 import { OrbitControls, useTexture } from '@react-three/drei'
-import { Canvas } from '@react-three/fiber'
-import { Suspense, useLayoutEffect, useState } from 'react'
-import { SRGBColorSpace, type Vector3 } from 'three'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Quaternion, SRGBColorSpace, Vector3, type Group } from 'three'
 import earthMap from '../../assets/earth-map.webp'
 import { latLonToVector3, vector3ToLatLon } from '../../utils/geo'
 import { HotspotMarker, type Hotspot } from './HotspotMarker'
@@ -51,8 +51,39 @@ function SelectionPin({ lat, lon }: GlobePick) {
   )
 }
 
-export function EarthGlobe({ onSelect }: { onSelect?: (pick: GlobePick) => void }) {
+function GlobeRig({ focus, children }: { focus: GlobePick | null; children: ReactNode }) {
+  const group = useRef<Group>(null)
+  const target = useMemo(() => new Quaternion(), [])
+  const cameraDirection = useMemo(() => new Vector3(), [])
+  const { camera } = useThree()
+  const settled = useRef(true)
+  const focusKey = focus ? `${focus.lat},${focus.lon}` : ''
+
+  useEffect(() => {
+    settled.current = focusKey === ''
+  }, [focusKey])
+
+  useFrame(() => {
+    if (!group.current || !focus || settled.current) return
+    const point = latLonToVector3(focus.lat, focus.lon).normalize()
+    cameraDirection.copy(camera.position).normalize()
+    target.setFromUnitVectors(point, cameraDirection)
+    group.current.quaternion.slerp(target, 0.12)
+    if (group.current.quaternion.angleTo(target) < 0.015) settled.current = true
+  })
+
+  return <group ref={group}>{children}</group>
+}
+
+export function EarthGlobe({
+  onSelect,
+  focus = null,
+}: {
+  onSelect?: (pick: GlobePick) => void
+  focus?: GlobePick | null
+}) {
   const [picked, setPicked] = useState<GlobePick | null>(null)
+  const aim = focus ?? picked
 
   function handlePick(point: Vector3) {
     const next = vector3ToLatLon(point)
@@ -66,13 +97,15 @@ export function EarthGlobe({ onSelect }: { onSelect?: (pick: GlobePick) => void 
         <color attach="background" args={['#0b0f17']} />
         <ambientLight intensity={0.55} />
         <directionalLight position={[4, 2, 3]} intensity={1.8} />
-        <Suspense fallback={null}>
-          <EarthSphere onPick={handlePick} />
-        </Suspense>
-        {MOCK_HOTSPOTS.map((hotspot) => (
-          <HotspotMarker key={hotspot.id} {...hotspot} />
-        ))}
-        {picked ? <SelectionPin lat={picked.lat} lon={picked.lon} /> : null}
+        <GlobeRig focus={aim}>
+          <Suspense fallback={null}>
+            <EarthSphere onPick={handlePick} />
+          </Suspense>
+          {MOCK_HOTSPOTS.map((hotspot) => (
+            <HotspotMarker key={hotspot.id} {...hotspot} />
+          ))}
+          {aim ? <SelectionPin lat={aim.lat} lon={aim.lon} /> : null}
+        </GlobeRig>
         <OrbitControls
           enablePan={false}
           enableDamping
