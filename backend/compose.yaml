@@ -1,0 +1,35 @@
+name: nasa-fire-api
+
+services:
+  db:
+    image: postgres:17-alpine
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: hotspots
+      POSTGRES_USER: hotspots
+      POSTGRES_PASSWORD: hotspots
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hotspots -d hotspots"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    environment:
+      PARQUET_DATA_DIR: /data
+      FIRE_DATA_YEARS: ${FIRE_DATA_YEARS:-2025}
+      DATABASE_URL: postgresql+psycopg://hotspots:hotspots@db:5432/hotspots
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
