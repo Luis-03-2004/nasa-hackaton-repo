@@ -32,18 +32,6 @@ const PROFILES: RegionProfile[] = [
     recent_anomaly_pct: 34,
   },
   {
-    id: 'amazonia',
-    region_name: 'Arco Amazônico',
-    lat: -5.2,
-    lon: -60.5,
-    calibration_status: 'calibrated_local',
-    peakWeek: 34,
-    scale: 70,
-    yearBoost: { 2020: 1.05, 2021: 0.9, 2022: 1.12, 2023: 0.98, 2024: 1.22, 2025: 1.08 },
-    alert_level: 'ATENCAO',
-    recent_anomaly_pct: 18,
-  },
-  {
     id: 'pantanal',
     region_name: 'Pantanal',
     lat: -17.5,

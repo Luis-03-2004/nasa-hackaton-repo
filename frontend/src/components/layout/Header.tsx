@@ -4,7 +4,6 @@ const CHIPS = [
   { id: 'world', label: '🌎 Mundo inteiro' },
   { id: 'brasil', label: '🇧🇷 Brasil' },
   { id: 'cerrado', label: '🔥 Cerrado' },
-  { id: 'amazonia', label: '🌲 Amazônia' },
   { id: 'pantanal', label: '🐊 Pantanal' },
 ] as const
 
