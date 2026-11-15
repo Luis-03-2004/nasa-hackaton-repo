@@ -157,11 +157,27 @@ def install_prepared(config, manifest):
     archive.unlink()
 
 
+def _preserved_env_lines():
+    preserved = []
+    for candidate in (ENV, Path("/etc/firecal/.env"), ROOT / ".env"):
+        if candidate.is_file():
+            try:
+                for line in candidate.read_text(encoding="utf-8").splitlines():
+                    stripped = line.strip()
+                    if stripped.startswith(("GROQ_API_KEY=", "GROK_API_KEY=", "GROQ_MODEL=", "GROQ_FALLBACK_MODEL=")):
+                        if stripped not in preserved:
+                            preserved.append(stripped)
+            except OSError:
+                pass
+    return preserved
+
+
 def credentials(config, release):
+    extra = _preserved_env_lines()
     if config.get("analytics_storage", "sqlite") == "sqlite":
         write_private(ENV, "\n".join([
             "FIRE_STORAGE=parquet", "FIRE_ANALYTICS_STORAGE=sqlite",
-            "FIRE_DATA_DIR=/data/global_1km_2000_2025", "CORS_ORIGINS=https://" + config["domain"], ""]))
+            "FIRE_DATA_DIR=/data/global_1km_2000_2025", "CORS_ORIGINS=https://" + config["domain"], *extra, ""]))
         return
     master = json.loads(aws(config, "secretsmanager", "get-secret-value",
                             "--secret-id", config["db_master_secret_arn"])["SecretString"])
@@ -191,7 +207,7 @@ def credentials(config, release):
         "FIRE_STORAGE=parquet", "FIRE_ANALYTICS_STORAGE=postgres",
         "ANALYTICS_DATABASE_URL=postgresql://" + suffix,
         "DATABASE_URL=postgresql+psycopg://" + suffix,
-        "FIRE_DATA_DIR=/data/global_1km_2000_2025", "CORS_ORIGINS=https://" + config["domain"], ""]))
+        "FIRE_DATA_DIR=/data/global_1km_2000_2025", "CORS_ORIGINS=https://" + config["domain"], *extra, ""]))
 
 
 def deploy(config):

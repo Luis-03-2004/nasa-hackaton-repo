@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarChart, HistoryChart, SelectionForecast } from '../components/charts/ExplorationCharts'
+import { ChatAssistant } from '../components/layout/ChatAssistant'
 import { ExplorerControls } from '../components/layout/ExplorerControls'
 import { InfoToggle } from '../components/layout/InfoToggle'
 import { Panel } from '../components/layout/Panel'
@@ -13,27 +14,37 @@ import type { Analysis, Country, ForecastSelection, MapData, MapMode, Query } fr
 import type { GlobeViewState } from '../utils/mapSelection'
 import { loadCountries, resolveCountryShape, countryDisplayName, type CountryShape } from '../utils/countries'
 
-const DEFAULT: Omit<Query, 'locale'> = { country: null, point_ids: [], start_date: '2000-01-01', end_date: '2025-12-31', months: [], sensors: ['modis', 'viirs-snpp', 'viirs-jpss1'], metric: 'records', resolution: 'monthly' }
+const DEFAULT: Omit<Query, 'locale'> = {
+  country: null,
+  point_ids: [],
+  start_date: '2025-10-01',
+  end_date: '2025-12-31',
+  months: [],
+  sensors: ['modis', 'viirs-snpp', 'viirs-jpss1'],
+  metric: 'records',
+  resolution: 'monthly',
+}
 const key = (value: string) => value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z]/g, '')
 const aliases: Record<string, string> = { unitedstatesofamerica: 'unitedstates', russianfederation: 'russia', republicofserbia: 'serbia', democraticrepublicofthecongo: 'demrepcongo', congodemocraticrepublic: 'demrepcongo', unitedrepublicoftanzania: 'tanzania', czechrepublic: 'czechia', eswatini: 'swaziland', ivorycoast: 'cotedivoire', republicofkorea: 'southkorea', democraticpeoplesrepublicofkorea: 'northkorea' }
 const countryKey = (value: string) => aliases[key(value)] ?? key(value)
+
 function initialState(): Omit<Query, 'locale'> {
   try {
     const saved = new URLSearchParams(window.location.hash.slice(1)).get('explore') ?? new URLSearchParams(window.location.search).get('explore')
     if (!saved) return DEFAULT
-    const parsed: unknown=JSON.parse(saved)
-    if (!parsed || typeof parsed!=='object') return DEFAULT
-    const q=parsed as Record<string,unknown>
-    const validDate=(value: unknown): value is string => typeof value==='string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value))
+    const parsed: unknown = JSON.parse(saved)
+    if (!parsed || typeof parsed !== 'object') return DEFAULT
+    const q = parsed as Record<string, unknown>
+    const validDate = (value: unknown): value is string => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value))
     return {
-      country: typeof q.country==='string' ? q.country : null,
-      point_ids: Array.isArray(q.point_ids) ? [...new Set(q.point_ids.filter((id): id is string => typeof id==='string' && /^pt_[+-]\d{2}_[+-]\d{3}$/.test(id)))].slice(0,64800) : [],
+      country: typeof q.country === 'string' ? q.country : null,
+      point_ids: Array.isArray(q.point_ids) ? [...new Set(q.point_ids.filter((id): id is string => typeof id === 'string' && /^pt_[+-]\d{2}_[+-]\d{3}$/.test(id)))].slice(0, 64800) : [],
       start_date: validDate(q.start_date) ? q.start_date : DEFAULT.start_date,
       end_date: validDate(q.end_date) ? q.end_date : DEFAULT.end_date,
-      months: Array.isArray(q.months) ? q.months.filter((v): v is number => Number.isInteger(v) && Number(v)>=1 && Number(v)<=12) : [],
-      sensors: Array.isArray(q.sensors) && q.sensors.length ? q.sensors.filter((v): v is string => typeof v==='string' && DEFAULT.sensors.includes(v)) : DEFAULT.sensors,
-      metric: ['records','detections','frp'].includes(String(q.metric)) ? q.metric as Query['metric'] : DEFAULT.metric,
-      resolution: ['monthly','yearly','weekly','daily'].includes(String(q.resolution)) ? q.resolution as Query['resolution'] : DEFAULT.resolution,
+      months: Array.isArray(q.months) ? q.months.filter((v): v is number => Number.isInteger(v) && Number(v) >= 1 && Number(v) <= 12) : [],
+      sensors: Array.isArray(q.sensors) && q.sensors.length ? q.sensors.filter((v): v is string => typeof v === 'string' && DEFAULT.sensors.includes(v)) : DEFAULT.sensors,
+      metric: ['records', 'detections', 'frp'].includes(String(q.metric)) ? q.metric as Query['metric'] : DEFAULT.metric,
+      resolution: ['monthly', 'yearly', 'weekly', 'daily'].includes(String(q.resolution)) ? q.resolution as Query['resolution'] : DEFAULT.resolution,
     }
   } catch { return DEFAULT }
 }
@@ -42,7 +53,6 @@ function cellId(lat: number, lon: number) {
   const signed = (value: number, digits: number) => `${value < 0 ? '-' : '+'}${String(Math.abs(value)).padStart(digits, '0')}`
   return `pt_${signed(Math.min(89, Math.floor(lat)), 2)}_${signed(Math.min(179, Math.floor(lon)), 3)}`
 }
-
 
 export function Dashboard() {
   const { locale, t, number } = useI18n()
@@ -60,12 +70,15 @@ export function Dashboard() {
   const [selectionMode, setSelectionMode] = useState(false)
   const [subtractSelection, setSubtractSelection] = useState(false)
   const [focus, setFocus] = useState<GlobePick | null>(null)
+  const [gpsPoint, setGpsPoint] = useState<GlobePick | null>(null)
   const [opacity, setOpacity] = useState(0.9)
+  const [mapLimit, setMapLimit] = useState(5000)
   const [selectedMonth, setSelectedMonth] = useState('')
   const [mapMonth, setMapMonth] = useState(0)
   const [analysis, setAnalysis] = useState<Analysis | null>(null)
   const [analysisError, setAnalysisError] = useState('')
   const [analysisLoading, setAnalysisLoading] = useState(true)
+  const [pendingExport, setPendingExport] = useState(false)
   const [mapA, setMapA] = useState<MapData | null>(null)
   const [mapB, setMapB] = useState<MapData | null>(null)
   const [mapError, setMapError] = useState('')
@@ -99,19 +112,54 @@ export function Dashboard() {
     const timer = window.setTimeout(() => {
       setAnalysisLoading(true); setAnalysisError('')
       postApi<Analysis>('/explore/query', query, controller.signal).then((response) => { if (!controller.signal.aborted) setAnalysis(response) }).catch((error: unknown) => { if (!controller.signal.aborted) { setAnalysis(null); setAnalysisError(error instanceof Error ? error.message : t('Falha na consulta.', 'Query failed.')) } }).finally(() => { if (!controller.signal.aborted) setAnalysisLoading(false) })
-    }, 300)
+    }, 220)
     return () => { controller.abort(); window.clearTimeout(timer) }
   }, [query, attempt])
 
-  const mapQuery = useMemo(() => ({ ...query, point_ids: [], months: mapMonth ? [mapMonth] : query.months, resolution: mapMonth ? 'monthly' as const : 'yearly' as const }), [query.country, query.sensors, query.months, query.metric, mapMonth, locale])
+  // Requirement 9: Map uses the active filters (date range, country, months, sensors, metric, resolution)
+  const mapResolution = useMemo<Query['resolution']>(() => {
+    if (mapMonth) return 'monthly'
+    if (query.resolution === 'daily') {
+      return query.country && query.start_date.slice(0, 4) === query.end_date.slice(0, 4) ? 'daily' : 'monthly'
+    }
+    if (query.resolution === 'weekly') {
+      return Number(query.end_date.slice(0, 4)) - Number(query.start_date.slice(0, 4)) <= 1 ? 'weekly' : 'monthly'
+    }
+    return query.resolution
+  }, [query.resolution, query.country, query.start_date, query.end_date, mapMonth])
+
+  const mapQuery = useMemo(
+    () => ({
+      ...query,
+      point_ids: [],
+      months: mapMonth ? [mapMonth] : query.months,
+      resolution: mapResolution,
+    }),
+    [query.country, query.start_date, query.end_date, query.sensors, query.months, query.metric, mapResolution, mapMonth, locale],
+  )
+
   useEffect(() => {
     const controller = new AbortController()
-    setMapLoading(true); setMapA(null); setMapB(null)
+    setMapLoading(true)
     const timer = window.setTimeout(() => {
       setMapError('')
-      const make = (selectedYear: number) => ({ ...mapQuery, start_date: `${selectedYear}-${String(mapMonth || 1).padStart(2, '0')}-01`, end_date: mapMonth ? `${selectedYear}-${String(mapMonth).padStart(2, '0')}-${new Date(Date.UTC(selectedYear, mapMonth, 0)).getUTCDate()}` : `${selectedYear}-12-31` })
-      Promise.all([postApi<MapData>('/explore/map', make(year), controller.signal), compare ? postApi<MapData>('/explore/map', make(yearB), controller.signal) : Promise.resolve(null)]).then(([a, b]) => { if (!controller.signal.aborted) { setMapA(a); setMapB(b) } }).catch((error: unknown) => { if (!controller.signal.aborted) { setMapA(null); setMapB(null); setMapError(error instanceof Error ? error.message : t('Falha no mapa.', 'Map failed.')) } }).finally(() => { if (!controller.signal.aborted) setMapLoading(false) })
-    }, 300)
+      const makeYearRange = (selectedYear: number) => ({
+        ...mapQuery,
+        resolution: mapMonth ? ('monthly' as const) : ('yearly' as const),
+        start_date: `${selectedYear}-${String(mapMonth || 1).padStart(2, '0')}-01`,
+        end_date: mapMonth ? `${selectedYear}-${String(mapMonth).padStart(2, '0')}-${new Date(Date.UTC(selectedYear, mapMonth, 0)).getUTCDate()}` : `${selectedYear}-12-31`,
+      })
+      const primaryPayload = compare || mapMonth
+        ? makeYearRange(year)
+        : mapQuery
+      Promise.all([
+        postApi<MapData>('/explore/map', primaryPayload, controller.signal),
+        compare ? postApi<MapData>('/explore/map', makeYearRange(yearB), controller.signal) : Promise.resolve(null),
+      ])
+        .then(([a, b]) => { if (!controller.signal.aborted) { setMapA(a); setMapB(b) } })
+        .catch((error: unknown) => { if (!controller.signal.aborted) { setMapA(null); setMapB(null); setMapError(error instanceof Error ? error.message : t('Falha no mapa.', 'Map failed.')) } })
+        .finally(() => { if (!controller.signal.aborted) setMapLoading(false) })
+    }, 220)
     return () => { controller.abort(); window.clearTimeout(timer) }
   }, [mapQuery, year, yearB, mapMonth, compare, attempt])
 
@@ -120,14 +168,34 @@ export function Dashboard() {
     const timer = window.setTimeout(() => {
       setForecastLoading(true); setForecastError('')
       postApi<ForecastSelection>('/forecast/selection', { country: filters.country, point_ids: filters.point_ids, reference_date: reference, locale }, controller.signal).then((response) => { if (!controller.signal.aborted) setForecast(response) }).catch((error: unknown) => { if (!controller.signal.aborted) { setForecast(null); setForecastError(error instanceof Error ? error.message : t('Falha na previsão.', 'Forecast failed.')) } }).finally(() => { if (!controller.signal.aborted) setForecastLoading(false) })
-    }, 400)
+    }, 350)
     return () => { controller.abort(); window.clearTimeout(timer) }
   }, [filters.country, filters.point_ids, reference, locale, attempt])
 
   const max = Math.max(mapA?.domain?.[1] ?? 0, mapB?.domain?.[1] ?? 0, (mapA as (MapData & { scale_max?: number }) | null)?.scale_max ?? 0, (mapB as (MapData & { scale_max?: number }) | null)?.scale_max ?? 0, 1)
-  const makeHotspots = (data: MapData | null): Hotspot[] => (data?.points ?? []).map((p) => ({ id: p.point_id, lat: p.lat_center, lon: p.lon_center, label: `${p.point_id} · ${number(p.value)}`, value: p.value, color: mode.startsWith('heat') ? fireIntensityColor(p.value, max) : '#fb923c', alertLevel: 'NORMAL' }))
-  const hotspotsA = useMemo(() => makeHotspots(mapA), [mapA, mode, max, opacity, locale])
-  const hotspotsB = useMemo(() => makeHotspots(mapB), [mapB, mode, max, opacity, locale])
+  const makeHotspots = useCallback((data: MapData | null): Hotspot[] => {
+    const raw = data?.points ?? []
+    let filtered = raw
+    if (mapLimit > 0 && raw.length > mapLimit) {
+      const selectedSet = new Set(filters.point_ids)
+      const selectedPts = raw.filter((p) => selectedSet.has(p.point_id))
+      const remainingPts = raw.filter((p) => !selectedSet.has(p.point_id)).sort((a, b) => b.value - a.value).slice(0, Math.max(0, mapLimit - selectedPts.length))
+      filtered = [...selectedPts, ...remainingPts]
+    }
+    return filtered.map((p) => ({
+      id: p.point_id,
+      lat: p.lat_center,
+      lon: p.lon_center,
+      label: `${p.point_id} · ${number(p.value)}`,
+      value: p.value,
+      country: p.country,
+      color: mode.startsWith('heat') ? fireIntensityColor(p.value, max) : '#fb923c',
+      alertLevel: 'NORMAL',
+    }))
+  }, [mapLimit, filters.point_ids, mode, max, number])
+
+  const hotspotsA = useMemo(() => makeHotspots(mapA), [mapA, makeHotspots, opacity, locale])
+  const hotspotsB = useMemo(() => makeHotspots(mapB), [mapB, makeHotspots, opacity, locale])
 
   function changeQuery(next: Query) {
     undo.current.push(filters); if (undo.current.length > 20) undo.current.shift()
@@ -135,41 +203,183 @@ export function Dashboard() {
     setAnalysisLoading(true); setFilters(values)
   }
   function changeSelection(ids: string[], operation: 'replace' | 'add' | 'toggle') {
-    if (subtractSelection) { const removed=new Set(ids); changeQuery({ ...query, point_ids: filters.point_ids.filter((id) => !removed.has(id)) }); return }
+    if (subtractSelection) { const removed = new Set(ids); changeQuery({ ...query, point_ids: filters.point_ids.filter((id) => !removed.has(id)) }); return }
     const next = new Set(operation === 'replace' ? [] : filters.point_ids)
     for (const id of ids) { if (operation === 'toggle' && next.has(id)) next.delete(id); else next.add(id) }
     changeQuery({ ...query, point_ids: [...next].sort() })
   }
-  function coordinate(lat: number, lon: number) { setFocus({ lat, lon }); changeSelection([cellId(lat, lon)], 'replace') }
-  function pickCountry(name: string) { const match = countries.find((c) => countryKey(c.name) === countryKey(name) || resolveCountryShape(c.name, shapes)?.name === name); if (match) changeQuery({ ...query, country: match.id, point_ids: [] }) }
-  function selectMonth(value: string) { setSelectedMonth(value); setYear(Number(value.slice(0, 4))); setMapMonth(Number(value.slice(5, 7))) }
-  function exportCsv() {
-    if (!analysis || analysisLoading) return
-    const quote = (value: unknown) => `"${String(value ?? '').replaceAll('"', '""')}"`
-    const metadata = JSON.stringify({ ...analysis.filters, unit: analysis.unit, method: analysis.method, coverage: analysis.coverage })
-    const rows = [['record_type', 'period', 'value', 'modis', 'viirs_snpp', 'viirs_noaa20', 'context'], ['metadata', '', '', '', '', '', metadata], ...analysis.timeseries.map((row) => ['observation', row.period, row.value, row.sensors.modis, row.sensors['viirs-snpp'], row.sensors['viirs-jpss1'], ''])]
-    const url = URL.createObjectURL(new Blob([rows.map((row) => row.map(quote).join(',')).join('\n')], { type: 'text/csv;charset=utf-8' }))
-    const anchor = document.createElement('a'); anchor.href = url; anchor.download = `firecal_${filters.country ?? 'world'}_${filters.resolution}.csv`; anchor.click(); URL.revokeObjectURL(url)
+  function coordinate(lat: number, lon: number, isGps = false) {
+    const pick: GlobePick = { lat, lon, seq: Date.now() }
+    setFocus(pick)
+    if (isGps) setGpsPoint(pick)
+    changeSelection([cellId(lat, lon)], 'replace')
   }
+  function pickCountry(name: string) {
+    const match = countries.find((c) => c.id === name || countryKey(c.name) === countryKey(name) || resolveCountryShape(c.name, shapes)?.name === name)
+    if (match) changeQuery({ ...query, country: match.id, point_ids: [] })
+  }
+  function resetWorld() {
+    setFocus(null)
+    if (filters.country || filters.point_ids.length) {
+      changeQuery({ ...query, country: null, point_ids: [] })
+    }
+  }
+  function handleYearChange(nextYear: number) {
+    setYear(nextYear)
+    if (!compare) {
+      changeQuery({ ...query, start_date: `${nextYear}-01-01`, end_date: `${nextYear}-12-31` })
+    }
+  }
+  function selectMonth(value: string) {
+    setSelectedMonth(value)
+    const y = Number(value.slice(0, 4))
+    const m = Number(value.slice(5, 7))
+    setYear(y)
+    setMapMonth(m)
+  }
+
+  const performExportCsv = useCallback((data: Analysis) => {
+    const quote = (value: unknown) => `"${String(value ?? '').replaceAll('"', '""')}"`
+    const metadata = JSON.stringify({ ...data.filters, unit: data.unit, method: data.method, coverage: data.coverage })
+    const rows = [['record_type', 'period', 'value', 'modis', 'viirs_snpp', 'viirs_noaa20', 'context'], ['metadata', '', '', '', '', '', metadata], ...data.timeseries.map((row) => ['observation', row.period, row.value, row.sensors.modis, row.sensors['viirs-snpp'], row.sensors['viirs-jpss1'], ''])]
+    const url = URL.createObjectURL(new Blob([rows.map((row) => row.map(quote).join(',')).join('\n')], { type: 'text/csv;charset=utf-8' }))
+    const anchor = document.createElement('a'); anchor.href = url; anchor.download = `bat_${filters.country ?? 'world'}_${filters.resolution}.csv`; anchor.click(); URL.revokeObjectURL(url)
+  }, [filters.country, filters.resolution])
+
+  useEffect(() => {
+    if (pendingExport && analysis && !analysisLoading) {
+      setPendingExport(false)
+      performExportCsv(analysis)
+    }
+  }, [pendingExport, analysis, analysisLoading, performExportCsv])
+
+  function exportCsv() {
+    if (analysisLoading) {
+      setPendingExport((prev) => !prev)
+      return
+    }
+    if (!analysis) return
+    performExportCsv(analysis)
+  }
+
   async function share() {
     const params = new URLSearchParams(); params.set('explore', JSON.stringify(filters))
     const url = `${window.location.origin}${window.location.pathname}#${params}`
     window.history.replaceState(null, '', url)
     try { await navigator.clipboard.writeText(url); setShareStatus(t('Link copiado.', 'Link copied.')) } catch { setShareStatus(t('Filtros salvos na URL do navegador.', 'Filters saved in the browser URL.')) }
   }
+
   function mapView(hotspots: Hotspot[]) {
-    const common = { hotspots, countries: shapes, selectedIds: filters.point_ids, onSelectionChange: changeSelection, onCountrySelect: pickCountry, selectionMode, heatmap: mode.startsWith('heat'), pointOpacity: opacity, locale }
-    return mode.endsWith('2d') || mode === '2d' ? <FlatMap {...common} selectedId={filters.point_ids[0] ?? null} onPick={(p) => coordinate(p.lat, p.lon)} onHotspotSelect={(id) => changeSelection([id], 'replace')} viewState={syncCamera ? camera2d : undefined} onViewStateChange={syncCamera ? setCamera2d : undefined} /> : <EarthGlobe {...common} globeViewState={syncCamera ? camera3d : undefined} onGlobeViewStateChange={syncCamera ? setCamera3d : undefined} focus={focus} onSelect={(p) => coordinate(p.lat, p.lon)} onHotspotSelect={(id) => changeSelection([id], 'replace')} />
+    const useSharedCamera = compare && syncCamera
+    const common = {
+      hotspots,
+      countries: shapes,
+      selectedIds: filters.point_ids,
+      focus,
+      gpsPoint,
+      onSelectionChange: changeSelection,
+      onCountrySelect: pickCountry,
+      onResetWorld: resetWorld,
+      selectionMode,
+      heatmap: mode.startsWith('heat'),
+      pointOpacity: opacity,
+      locale,
+    }
+    return mode.endsWith('2d') || mode === '2d'
+      ? <FlatMap {...common} selectedId={filters.point_ids[0] ?? null} onPick={(p) => coordinate(p.lat, p.lon, false)} onHotspotSelect={(id) => changeSelection([id], 'replace')} viewState={useSharedCamera ? camera2d : undefined} onViewStateChange={useSharedCamera ? setCamera2d : undefined} />
+      : <EarthGlobe {...common} globeViewState={useSharedCamera ? camera3d : undefined} onGlobeViewStateChange={useSharedCamera ? setCamera3d : undefined} onSelect={(p) => coordinate(p.lat, p.lon, false)} onHotspotSelect={(id) => changeSelection([id], 'replace')} />
   }
 
+  const mapSubtitle = compare
+    ? `${year} / ${yearB}`
+    : mapMonth
+      ? `${year}-${String(mapMonth).padStart(2, '0')}`
+      : `${filters.start_date} → ${filters.end_date}`
+
   return <main className="mx-auto max-w-[1800px] space-y-4 p-3 md:p-5">
-    <ExplorerControls query={query} countries={countries} onChange={changeQuery} mode={mode} onMode={setMode} year={year} yearB={yearB} onYear={setYear} onYearB={setYearB} compare={compare} onCompare={setCompare} selectionMode={selectionMode} onSelectionMode={setSelectionMode} selectedCount={filters.point_ids.length} onClear={() => changeQuery({ ...query, point_ids: [] })} onUndo={() => { const previous = undo.current.pop(); if (previous) { setAnalysisLoading(true); setFilters(previous) } }} onCoordinate={coordinate} onExport={exportCsv} canExport={!!analysis && !analysisLoading} countryLabel={countryLabel} />
-    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400"><p>{selectionLabel} · {filters.start_date} → {filters.end_date} · {filters.sensors.length} {t('sensores', 'sensors')}</p><button type="button" onClick={() => void share()} className="control-button">{t('Compartilhar filtros', 'Share filters')}</button>{shareStatus && <span role="status">{shareStatus}</span>}<button type="button" className="control-button" onClick={() => { setMapLoading(true); setAnalysisLoading(true); setAttempt((v) => v + 1) }}>{t('Atualizar', 'Refresh')}</button></div>
-    <Panel eyebrow={t('Exploração espacial e temporal', 'Spatial and temporal exploration')} title={`${selectionLabel} · ${t('mapa', 'map')} ${year}${compare ? ` / ${yearB}` : ''}`} info={t('Passe o mouse para destacar um país. Clique em um ponto para consultar sua célula de 1°. Shift+clique alterna pontos e Shift+arraste seleciona conjuntos; no celular use Selecionar área. Todos os IDs selecionados são processados, mesmo quando a visualização reduz detalhes. O mapa usa o ano A/B e os meses selecionados; o gráfico usa o intervalo de datas indicado no cabeçalho. Contornos territoriais são estáticos. Sem registros não comprova ausência de fogo.', 'Hover to highlight a country. Click a point to query its 1° cell. Shift+click toggles points and Shift+drag selects a group; on touch use Select area. All selected IDs are processed even when visual detail is reduced. The map uses year A/B and selected months; the chart uses the date range in the header. Territorial boundaries are static. No registered detections do not prove absence of fire.')}>
-      <div className="flex flex-wrap items-center gap-3 px-4 pb-2 text-xs text-slate-300"><label className="flex items-center gap-2">{t('Mês do mapa', 'Map month')}<select aria-label={t('Mês do mapa', 'Map month')} value={mapMonth} onChange={(e) => setMapMonth(Number(e.target.value))} className="rounded border border-white/15 bg-[#070b12] px-2 py-1"><option value={0}>{t('Ano completo', 'Whole year')}</option>{Array.from({ length: 12 }, (_, i) => <option key={i} value={i + 1}>{new Intl.DateTimeFormat(locale, { month: 'long', timeZone: 'UTC' }).format(new Date(Date.UTC(2025, i, 1)))}</option>)}</select></label>{compare && <label className="flex items-center gap-2"><input type="checkbox" checked={syncCamera} onChange={(e) => setSyncCamera(e.target.checked)} />{t('Sincronizar câmeras', 'Sync cameras')}</label>}<label className="flex items-center gap-2"><input type="checkbox" checked={subtractSelection} onChange={(e) => setSubtractSelection(e.target.checked)} />{t('Subtrair da seleção', 'Subtract from selection')}</label><span>{t('Escala comum', 'Shared scale')}: 0 → {number(max)} · {mapA?.unit ?? ''}</span>{mode.startsWith('heat') && <><span role="img" aria-label={t('Branco → amarelo → laranja → vermelho', 'White → yellow → orange → red')} className="h-2 w-24 rounded" style={{ backgroundImage: FIRE_COLOR_GRADIENT }} /><label className="flex items-center gap-2">{t('Opacidade', 'Opacity')}<input aria-label={t('Opacidade', 'Opacity')} type="range" min="0.2" max="1" step="0.1" value={opacity} onChange={(e) => setOpacity(Number(e.target.value))} /></label></>}</div>
+    <ExplorerControls
+      query={query}
+      countries={countries}
+      onChange={(next) => { setMapMonth(0); changeQuery(next) }}
+      mode={mode}
+      onMode={setMode}
+      year={year}
+      yearB={yearB}
+      onYear={handleYearChange}
+      onYearB={setYearB}
+      compare={compare}
+      onCompare={setCompare}
+      selectionMode={selectionMode}
+      onSelectionMode={setSelectionMode}
+      selectedCount={filters.point_ids.length}
+      onClear={() => { setGpsPoint(null); setFocus(null); changeQuery({ ...query, point_ids: [] }) }}
+      onUndo={() => { const previous = undo.current.pop(); if (previous) { setAnalysisLoading(true); setFilters(previous) } }}
+      onCoordinate={coordinate}
+      onExport={exportCsv}
+      canExport={!!analysis && !analysisLoading}
+      exportLoading={analysisLoading}
+      pendingExport={pendingExport}
+      countryLabel={countryLabel}
+      gpsActive={!!gpsPoint}
+    />
+    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
+      <p>{selectionLabel} · {filters.start_date} → {filters.end_date} · {filters.sensors.length} {t('sensores', 'sensors')}</p>
+      {gpsPoint && (
+        <span className="rounded-full border border-cyan-400/40 bg-cyan-500/15 px-2.5 py-0.5 font-mono text-[11px] text-cyan-200">
+          📍 GPS: {gpsPoint.lat.toFixed(3)}°, {gpsPoint.lon.toFixed(3)}°
+        </span>
+      )}
+      <button type="button" onClick={() => void share()} className="control-button">{t('Compartilhar filtros', 'Share filters')}</button>
+      {shareStatus && <span role="status">{shareStatus}</span>}
+      <button type="button" className="control-button" onClick={() => { setMapLoading(true); setAnalysisLoading(true); setAttempt((v) => v + 1) }}>{t('Atualizar', 'Refresh')}</button>
+    </div>
+    <Panel
+      eyebrow={t('Exploração espacial e temporal', 'Spatial and temporal exploration')}
+      title={`${selectionLabel} · ${t('mapa', 'map')} (${mapSubtitle})`}
+      info={t(
+        'Clique em cima de um ponto para selecionar sua célula de 1°. Use Ctrl+Clique sobre um ponto para selecionar o país daquele ponto. Shift+clique alterna pontos e Shift+arraste seleciona áreas. Clicar no botão Mundo remove a seleção de país e exibe todos os países do mundo. Todos os filtros de data, país, sensores e métrica são aplicados ao mapa e ao CSV.',
+        'Click on a point to select its 1° cell. Use Ctrl+Click on a point to select the country of that point. Shift+Click toggles points and Shift+Drag selects areas. Clicking the World button clears the country selection and shows all countries in the world. All date, country, sensor, and metric filters apply to both the map and CSV.',
+      )}
+    >
+      <div className="flex flex-wrap items-center gap-3 px-4 pb-2 text-xs text-slate-300">
+        <label className="flex items-center gap-2">{t('Mês do mapa', 'Map month')}
+          <select aria-label={t('Mês do mapa', 'Map month')} value={mapMonth} onChange={(e) => setMapMonth(Number(e.target.value))} className="rounded border border-white/15 bg-[#070b12] px-2 py-1">
+            <option value={0}>{t('Usar período filtrado', 'Use filtered date range')}</option>
+            {Array.from({ length: 12 }, (_, i) => <option key={i} value={i + 1}>{new Intl.DateTimeFormat(locale, { month: 'long', timeZone: 'UTC' }).format(new Date(Date.UTC(2025, i, 1)))}</option>)}
+          </select>
+        </label>
+        <label className="flex items-center gap-2">{t('Limite de pontos no mapa', 'Map point limit')}
+          <select aria-label={t('Limite de pontos no mapa', 'Map point limit')} value={mapLimit} onChange={(e) => setMapLimit(Number(e.target.value))} className="rounded border border-white/15 bg-[#070b12] px-2 py-1 font-mono">
+            <option value={2500}>{t('Top 2.500 (Rápido)', 'Top 2,500 (Fast)')}</option>
+            <option value={5000}>{t('Top 5.000 (Padrão)', 'Top 5,000 (Default)')}</option>
+            <option value={10000}>{t('Top 10.000', 'Top 10,000')}</option>
+            <option value={0}>{t('Todos os pontos', 'All points')}</option>
+          </select>
+        </label>
+        {compare && <label className="flex items-center gap-2"><input type="checkbox" checked={syncCamera} onChange={(e) => setSyncCamera(e.target.checked)} />{t('Sincronizar câmeras', 'Sync cameras')}</label>}
+        <label className="flex items-center gap-2"><input type="checkbox" checked={subtractSelection} onChange={(e) => setSubtractSelection(e.target.checked)} />{t('Subtrair da seleção', 'Subtract from selection')}</label>
+        <span>{t('Escala comum', 'Shared scale')}: 0 → {number(max)} · {mapA?.unit ?? ''}</span>
+        {mode.startsWith('heat') && <>
+          <span role="img" aria-label={t('Branco → amarelo → laranja → vermelho', 'White → yellow → orange → red')} className="h-2 w-24 rounded" style={{ backgroundImage: FIRE_COLOR_GRADIENT }} />
+          <label className="flex items-center gap-2">{t('Opacidade', 'Opacity')}<input aria-label={t('Opacidade', 'Opacity')} type="range" min="0.2" max="1" step="0.1" value={opacity} onChange={(e) => setOpacity(Number(e.target.value))} /></label>
+        </>}
+      </div>
       {mapError && <p role="alert" className="px-4 py-3 text-sm text-amber-200">{mapError}</p>}
       {mapLoading && <p role="status" className="px-4 pb-2 text-xs text-purple-200">{t('Carregando o período histórico…', 'Loading the historical period…')}</p>}
-      <div className={`grid gap-px bg-slate-700 ${compare ? 'lg:grid-cols-2' : 'grid-cols-1'}`}>{(['A', ...(compare ? ['B'] : [])] as Array<'A' | 'B'>).map((side) => <div key={side} className="relative h-[52vh] min-h-[350px] bg-[#070b12]"><p className="pointer-events-none absolute top-3 left-3 z-10 rounded-lg bg-[#070b12]/90 px-3 py-2 font-mono text-xs">{side}: {side === 'A' ? year : yearB} · {number((side === 'A' ? mapA : mapB)?.points.length ?? 0)} {t('células', 'cells')}</p><div className={`h-full ${mapLoading ? 'opacity-40' : ''}`}>{mapView(side === 'A' ? hotspotsA : hotspotsB)}</div></div>)}</div>
+      <div className={`grid gap-px bg-slate-700 ${compare ? 'lg:grid-cols-2' : 'grid-cols-1'}`}>
+        {(['A', ...(compare ? ['B'] : [])] as Array<'A' | 'B'>).map((side) => {
+          const sideMap = side === 'A' ? mapA : mapB
+          const sideHotspots = side === 'A' ? hotspotsA : hotspotsB
+          return (
+            <div key={side} className="relative h-[52vh] min-h-[350px] bg-[#070b12]">
+              <p className="pointer-events-none absolute top-3 left-3 z-10 rounded-lg bg-[#070b12]/90 px-3 py-2 font-mono text-xs">
+                {side}: {side === 'A' ? (compare ? year : mapSubtitle) : yearB} · {number(sideHotspots.length)} / {number(sideMap?.points.length ?? 0)} {t('células', 'cells')}
+              </p>
+              <div className={`h-full ${mapLoading ? 'opacity-40' : ''}`}>{mapView(sideHotspots)}</div>
+            </div>
+          )
+        })}
+      </div>
       {(mapA?.coverage.partial || mapB?.coverage.partial) && <p className="px-4 py-2 text-xs text-amber-200">{t('Período com disponibilidade parcial de arquivos/sensores. Confira as informações de cobertura.', 'Period with partial file/sensor availability. Check coverage information.')}</p>}
     </Panel>
     {analysisLoading && <p role="status" className="px-2 text-sm text-purple-200">{t('Calculando todos os elementos do recorte…', 'Calculating all elements in the selection…')}</p>}
@@ -182,6 +392,7 @@ export function Dashboard() {
       <div className="grid min-w-0 items-start gap-4 xl:grid-cols-2"><CalendarChart data={analysis} selectedMonth={selectedMonth} onMonth={selectMonth} /><div className="min-w-0 space-y-4"><HistoryChart data={analysis} selectedMonth={selectedMonth} onMonth={selectMonth} /><SelectionForecast data={forecast} loading={forecastLoading} error={forecastError} reference={reference} onReference={setReference} /></div></div>
     </>}
     {(!analysis || analysisLoading) && <SelectionForecast data={forecast} loading={forecastLoading} error={forecastError} reference={reference} onReference={setReference} />}
-    <footer className="rounded-xl border border-white/10 p-3 text-[11px] text-slate-400"><div className="flex flex-wrap items-center justify-between gap-2"><p>NASA FIRMS / EOSDIS · MODIS C6.1 · VIIRS 375 m</p><InfoToggle label={t('Informações: fontes e limitações', 'Information: sources and limitations')}>{t('0 significa sem detecção registrada nos arquivos disponíveis; não comprova ausência de fogo ou céu limpo. Um registro não é um incêndio único. F₂ é uma projeção estatística experimental da equipe, não uma previsão oficial da NASA. Métricas, disponibilidade e métodos são identificados em cada painel.', '0 means no registered detection in the available files; it does not prove absence of fire or clear skies. One record is not one unique fire. F₂ is the team’s experimental statistical projection, not an official NASA forecast. Metrics, availability and methods are identified in each panel.')}</InfoToggle></div></footer>
+    <footer className="rounded-xl border border-white/10 p-3 text-[11px] text-slate-400"><div className="flex flex-wrap items-center justify-between gap-2"><p>BAT (Brightness Anomaly Tracker) · NASA FIRMS / EOSDIS · MODIS C6.1 · VIIRS 375 m</p><InfoToggle label={t('Informações: fontes e limitações', 'Information: sources and limitations')}>{t('0 significa sem detecção registrada nos arquivos disponíveis; não comprova ausência de fogo ou céu limpo. Um registro não é um incêndio único. F₂ é uma projeção estatística experimental da equipe, não uma previsão oficial da NASA. Métricas, disponibilidade e métodos são identificados em cada painel.', '0 means no registered detection in the available files; it does not prove absence of fire or clear skies. One record is not one unique fire. F₂ is the team’s experimental statistical projection, not an official NASA forecast. Metrics, availability and methods are identified in each panel.')}</InfoToggle></div></footer>
+    <ChatAssistant query={query} referenceDate={reference} focus={focus} onCoordinate={coordinate} />
   </main>
 }

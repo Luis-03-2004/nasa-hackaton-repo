@@ -11,11 +11,11 @@ interface I18n {
 const Context = createContext<I18n | null>(null)
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocale] = useState<Locale>(() => {
-    try { return localStorage.getItem('firecal.locale') === 'en' ? 'en' : 'pt-BR' } catch { return 'pt-BR' }
+    try { return localStorage.getItem('bat.locale') === 'pt-BR' ? 'pt-BR' : 'en' } catch { return 'en' }
   })
   useEffect(() => {
     document.documentElement.lang = locale
-    try { localStorage.setItem('firecal.locale', locale) } catch { /* Browser storage may be disabled. */ }
+    try { localStorage.setItem('bat.locale', locale) } catch { /* Browser storage may be disabled. */ }
   }, [locale])
   const value = useMemo<I18n>(() => ({
     locale, setLocale,
@@ -35,7 +35,7 @@ export function LanguageSelector() {
   return <label className="flex items-center gap-2 text-xs text-slate-300">
     <span>{t('Idioma', 'Language')}</span>
     <select aria-label={t('Idioma', 'Language')} value={locale} onChange={(event) => setLocale(event.target.value as Locale)} className="rounded-lg border border-white/15 bg-[#0f1623] px-2 py-2 text-white">
-      <option value="pt-BR">PT-BR</option><option value="en">EN</option>
+      <option value="en">EN</option><option value="pt-BR">PT-BR</option>
     </select>
   </label>
 }

@@ -285,27 +285,27 @@ def normalise(query):
     return q
 
 
-def _scope(db,q):
+def _scope(db,q,populate=True):
     clauses=[]; params=[]
     if q['country']:
         clauses.append('m.country=?'); params.append(q['country'])
     if q['point_ids']:
-        db.execute('CREATE TEMP TABLE IF NOT EXISTS chosen(lat INTEGER,lon INTEGER,PRIMARY KEY(lat,lon)) WITHOUT ROWID')
-        db.executemany('INSERT OR IGNORE INTO chosen VALUES(?,?)',[parse_point(p) for p in q['point_ids']])
+        if populate:
+            db.execute('CREATE TEMP TABLE IF NOT EXISTS chosen(lat INTEGER,lon INTEGER,PRIMARY KEY(lat,lon)) WITHOUT ROWID')
+            db.executemany('INSERT OR IGNORE INTO chosen VALUES(?,?)',[parse_point(p) for p in q['point_ids']])
         clauses.append('EXISTS(SELECT 1 FROM chosen c WHERE c.lat=m.lat AND c.lon=m.lon)')
     return clauses,params
 
 
-def _monthly_where(db,q,climatology=False,annual=False):
-    clauses,params = _scope(db,q)
+def _monthly_where(db,q,climatology=False,annual=False,populate=True):
+    clauses,params = _scope(db,q,populate=populate)
     clauses.append('sensor IN ('+','.join('?' for _ in q['sensors'])+')');params.extend(q['sensors'])
     if climatology:
         clauses.append('year BETWEEN 2003 AND 2023')
     else:
         a=date.fromisoformat(q['start_date']);b=date.fromisoformat(q['end_date'])
-        if annual:
-            clauses.append('year BETWEEN ? AND ?');params.extend((a.year,b.year))
-        else:
+        clauses.append('year BETWEEN ? AND ?');params.extend((a.year,b.year))
+        if not annual and (a.month != 1 or b.month != 12):
             clauses.append('(year*100+month) BETWEEN ? AND ?');params.extend((a.year*100+a.month,b.year*100+b.month))
     if q['months']:
         clauses.append('month IN ('+','.join('?' for _ in q['months'])+')');params.extend(q['months'])
@@ -376,19 +376,45 @@ def query_analysis(query):
     ensure_cube(q['locale'])
     if q['resolution']=='weekly': return _weekly(q,map_mode=False)
     column=_column(q['metric'])
+    col_idx={'records':3,'detections':4,'frp':5,'harmonized':6}[column]
     with _connect() as db:
-        where,params=_monthly_where(db,q)
+        where,params=_monthly_where(db,q,populate=True)
         table='monthly' if q['point_ids'] else 'country_monthly'
-        rows=db.execute(f'SELECT year,month,sensor,sum({column}) FROM {table} m WHERE {where} GROUP BY year,month,sensor ORDER BY year,month',params).fetchall()
+        raw_rows=db.execute(f'SELECT year,month,sensor,sum(records),sum(detections),sum(frp),sum(harmonized) FROM {table} m WHERE {where} GROUP BY year,month,sensor ORDER BY year,month',params).fetchall()
+        rows=[(r[0],r[1],r[2],r[col_idx]) for r in raw_rows]
+        totals=(
+            sum(float(r[col_idx] or 0) for r in raw_rows),
+            sum(int(r[3] or 0) for r in raw_rows),
+            sum(int(r[4] or 0) for r in raw_rows),
+            sum(float(r[5] or 0) for r in raw_rows),
+        )
         # Climatology uses the same spatial/sensor/month selection but baseline years.
-        cwhere,cparams=_monthly_where(db,q,True)
-        climrows=db.execute(f'SELECT year,month,sensor,sum({column}) FROM {table} m WHERE {cwhere} GROUP BY year,month,sensor',cparams).fetchall()
+        a_dt=date.fromisoformat(q['start_date']); b_dt=date.fromisoformat(q['end_date'])
+        if a_dt <= date(2003,1,1) and b_dt >= date(2023,12,31):
+            climrows=rows
+        else:
+            needed_months=q['months'] or (list(range(a_dt.month,b_dt.month+1)) if a_dt.year==b_dt.year else [])
+            clim_q={**q,'months':needed_months} if needed_months else q
+            cwhere,cparams=_monthly_where(db,clim_q,True,populate=False)
+            climrows=db.execute(f'SELECT year,month,sensor,sum({column}) FROM {table} m WHERE {cwhere} GROUP BY year,month,sensor',cparams).fetchall()
         allrows={(y,m,s):(y,m,s,v) for y,m,s,v in climrows}
         allrows.update({(y,m,s):(y,m,s,v) for y,m,s,v in rows})
         all_available=_availability(db,{**q,'start_date':'2000-01-01','end_date':'2025-12-31'})
         cells=_calendar(list(allrows.values()),q,all_available)
-        totals=db.execute(f'SELECT coalesce(sum({column}),0),coalesce(sum(records),0),coalesce(sum(detections),0),coalesce(sum(frp),0) FROM {table} m WHERE {where}',params).fetchone()
-        processed=db.execute(f'SELECT count(*) FROM (SELECT DISTINCT lat,lon FROM monthly m WHERE {where})',params).fetchone()[0]
+        if q['point_ids'] and analytics_database.storage_mode() != 'postgres':
+            p_clauses=['m.lat=c.lat','m.lon=c.lon']
+            p_params=[]
+            if q['country']:
+                p_clauses.append('m.country=?'); p_params.append(q['country'])
+            p_clauses.append('m.sensor IN ('+','.join('?' for _ in q['sensors'])+')'); p_params.extend(q['sensors'])
+            p_clauses.append('m.year BETWEEN ? AND ?'); p_params.extend((a_dt.year,b_dt.year))
+            if a_dt.month != 1 or b_dt.month != 12:
+                p_clauses.append('(m.year*100+m.month) BETWEEN ? AND ?'); p_params.extend((a_dt.year*100+a_dt.month,b_dt.year*100+b_dt.month))
+            if q['months']:
+                p_clauses.append('m.month IN ('+','.join('?' for _ in q['months'])+')'); p_params.extend(q['months'])
+            processed=db.execute(f"SELECT count(*) FROM chosen c WHERE EXISTS(SELECT 1 FROM monthly m WHERE {' AND '.join(p_clauses)})",p_params).fetchone()[0]
+        else:
+            processed=db.execute(f'SELECT count(*) FROM (SELECT DISTINCT lat,lon FROM monthly m WHERE {where})',params).fetchone()[0]
         selected=_selected_count(db,q); available=_availability(db,q)
     values=defaultdict(lambda:{'value':0.,'sensors':{s:None for s in SENSORS}})
     a=date.fromisoformat(q['start_date']);b=date.fromisoformat(q['end_date'])

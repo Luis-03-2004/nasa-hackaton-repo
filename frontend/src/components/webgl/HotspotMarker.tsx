@@ -11,6 +11,7 @@ export interface Hotspot {
   label: string
   value?: number
   unit?: string
+  country?: string
   alertLevel?: LocalForecast['alert_level']
 }
 

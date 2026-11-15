@@ -37,7 +37,7 @@ export function Header({ view, date, regionId, regions, onViewChange, onDateChan
   return <div className="flex flex-col gap-3">
     <div className="flex items-center gap-3"><span className="h-10 w-1 rounded-full bg-[#fc3d21]" /><div>
       <p className="font-mono text-[10px] tracking-[0.2em] text-[#ff8a73] uppercase">NASA FIRMS · 2000–2025</p>
-      <h1 className="text-xl font-semibold tracking-tight">FireCal Global</h1>
+      <h1 className="text-xl font-semibold tracking-tight">BAT — Brightness Anomaly Tracker</h1>
     </div></div>
     <div className="grid grid-cols-3 gap-1 rounded-xl border border-white/10 p-1">
       {([{ id: '3d', label: 'Globo 3D' }, { id: '2d', label: 'Mapa 2D' }, { id: 'heat', label: 'Calendário' }] as const).map((item) =>

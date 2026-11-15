@@ -265,3 +265,6 @@ app.include_router(exploration_router)
 
 from app.forecast_selection_routes import router as forecast_selection_router
 app.include_router(forecast_selection_router)
+
+from app.chat_routes import router as chat_router
+app.include_router(chat_router)

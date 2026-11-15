@@ -38,9 +38,12 @@ def main():
     mode.add_argument('--status', action='store_true', help='Consulta os serviços iniciados por --detach')
     mode.add_argument('--serve', action='store_true', help=argparse.SUPPRESS)
     args = parser.parse_args()
-    if sys.version_info[:3] != (3, 12, 2):
-        raise SystemExit(f"Use Python 3.12.2; encontrado {sys.version.split()[0]}")
-    data_dir = Path(os.getenv("FIRE_DATA_DIR", WEB_DIR.parent / "data/global_1km_2000_2025")).resolve()
+    if sys.version_info[:2] < (3, 12):
+        raise SystemExit(f"Use Python 3.12+; encontrado {sys.version.split()[0]}")
+    default_data_dir = WEB_DIR / "data/global_1km_2000_2025"
+    if not default_data_dir.is_dir() and (WEB_DIR.parent / "data/global_1km_2000_2025").is_dir():
+        default_data_dir = WEB_DIR.parent / "data/global_1km_2000_2025"
+    data_dir = Path(os.getenv("FIRE_DATA_DIR", default_data_dir)).resolve()
     runtime_dir = data_dir / "web_local"
     pid_path = runtime_dir / "supervisor.pid"
     def owned_pid():
