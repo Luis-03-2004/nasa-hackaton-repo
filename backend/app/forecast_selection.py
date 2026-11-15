@@ -117,13 +117,11 @@ def _ensure_fast_tables(db):
     has_meta = db.execute("SELECT 1 FROM sqlite_master WHERE name='metadata'").fetchone()
     if not has_meta:
         return False
-    sig = source_signature()
-    row_sig = db.execute("SELECT value FROM metadata WHERE key='fast_signature'").fetchone()
+    sig = raw_source_signature()
     has_fast = bool(
         db.execute("SELECT 1 FROM sqlite_master WHERE name='fast_clim_blob'").fetchone()
         and db.execute("SELECT 1 FROM sqlite_master WHERE name='fast_obs'").fetchone()
-        and row_sig is not None
-        and row_sig[0] == sig
+        and db.execute("SELECT 1 FROM fast_clim_blob LIMIT 1").fetchone()
     )
     if has_fast:
         return True
