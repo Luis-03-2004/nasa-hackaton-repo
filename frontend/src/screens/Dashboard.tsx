@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarChart, HistoryChart, SelectionForecast } from '../components/charts/ExplorationCharts'
 import { ChatAssistant } from '../components/layout/ChatAssistant'
 import { ExplorerControls } from '../components/layout/ExplorerControls'
-import { InfoToggle } from '../components/layout/InfoToggle'
+import { InfoToggle, MetricInfo } from '../components/layout/InfoToggle'
 import { Panel } from '../components/layout/Panel'
 import { EarthGlobe, type GlobePick } from '../components/webgl/EarthGlobe'
 import { FlatMap } from '../components/webgl/FlatMap'
@@ -87,6 +87,7 @@ export function Dashboard() {
   const [forecast, setForecast] = useState<ForecastSelection | null>(null)
   const [forecastError, setForecastError] = useState('')
   const [forecastLoading, setForecastLoading] = useState(true)
+  const [forecastMapHorizon, setForecastMapHorizon] = useState<number | null>(null)
   const [attempt, setAttempt] = useState(0)
   const [shareStatus, setShareStatus] = useState('')
   const undo = useRef<Array<Omit<Query, 'locale'>>>([])
@@ -196,6 +197,26 @@ export function Dashboard() {
 
   const hotspotsA = useMemo(() => makeHotspots(mapA), [mapA, makeHotspots, opacity, locale])
   const hotspotsB = useMemo(() => makeHotspots(mapB), [mapB, makeHotspots, opacity, locale])
+
+  const forecastHotspots = useMemo<Hotspot[] | null>(() => {
+    if (!forecastMapHorizon || !forecast?.available || !forecast.map_points?.length) return null
+    const hKey = (`h${forecastMapHorizon}` as 'h1' | 'h2' | 'h3' | 'h4')
+    const pts = forecast.map_points
+    const maxForecastVal = Math.max(1, ...pts.map((p) => p[hKey] ?? 0))
+    return pts.map((p) => {
+      const val = p[hKey] ?? 0
+      return {
+        id: p.point_id,
+        lat: p.lat_center,
+        lon: p.lon_center,
+        label: `${p.point_id} · F₂ t+${forecastMapHorizon}: ${number(val)} (${p.mode})`,
+        value: val,
+        country: p.country,
+        color: fireIntensityColor(val, maxForecastVal),
+        alertLevel: p.anomaly_pct_h1 > 25 ? 'CRITICAL' : p.anomaly_pct_h1 > 5 ? 'WATCH' : 'NORMAL',
+      }
+    })
+  }, [forecastMapHorizon, forecast, number])
 
   function changeQuery(next: Query) {
     undo.current.push(filters); if (undo.current.length > 20) undo.current.shift()
@@ -342,40 +363,100 @@ export function Dashboard() {
       )}
     >
       <div className="flex flex-wrap items-center gap-3 px-4 pb-2 text-xs text-slate-300">
-        <label className="flex items-center gap-2">{t('Mês do mapa', 'Map month')}
-          <select aria-label={t('Mês do mapa', 'Map month')} value={mapMonth} onChange={(e) => setMapMonth(Number(e.target.value))} className="rounded border border-white/15 bg-[#070b12] px-2 py-1">
-            <option value={0}>{t('Usar período filtrado', 'Use filtered date range')}</option>
-            {Array.from({ length: 12 }, (_, i) => <option key={i} value={i + 1}>{new Intl.DateTimeFormat(locale, { month: 'long', timeZone: 'UTC' }).format(new Date(Date.UTC(2025, i, 1)))}</option>)}
-          </select>
-        </label>
-        <label className="flex items-center gap-2">{t('Limite de pontos no mapa', 'Map point limit')}
-          <select aria-label={t('Limite de pontos no mapa', 'Map point limit')} value={mapLimit} onChange={(e) => setMapLimit(Number(e.target.value))} className="rounded border border-white/15 bg-[#070b12] px-2 py-1 font-mono">
-            <option value={2500}>{t('Top 2.500 (Rápido)', 'Top 2,500 (Fast)')}</option>
-            <option value={5000}>{t('Top 5.000 (Padrão)', 'Top 5,000 (Default)')}</option>
-            <option value={10000}>{t('Top 10.000', 'Top 10,000')}</option>
-            <option value={0}>{t('Todos os pontos', 'All points')}</option>
-          </select>
-        </label>
+        <div className="flex items-center gap-1">
+          <label className="flex items-center gap-2">{t('Mês do mapa', 'Map month')}
+            <select aria-label={t('Mês do mapa', 'Map month')} value={mapMonth} onChange={(e) => setMapMonth(Number(e.target.value))} className="rounded border border-white/15 bg-[#070b12] px-2 py-1">
+              <option value={0}>{t('Usar período filtrado', 'Use filtered date range')}</option>
+              {Array.from({ length: 12 }, (_, i) => <option key={i} value={i + 1}>{new Intl.DateTimeFormat(locale, { month: 'long', timeZone: 'UTC' }).format(new Date(Date.UTC(2025, i, 1)))}</option>)}
+            </select>
+          </label>
+          <MetricInfo term={t('Mês do Mapa', 'Map Month')}>
+            {t(
+              'Permite focar o mapa em um único mês do ano selecionado (ou clicar em uma célula no Calendário abaixo) sem perder a Série Temporal completa.',
+              'Focuses the map on a single month of the selected year (or when clicking a cell in the Calendar below) while keeping the full Historical Time Series intact.',
+            )}
+          </MetricInfo>
+        </div>
+        <div className="flex items-center gap-1">
+          <label className="flex items-center gap-2">{t('Limite de pontos no mapa', 'Map point limit')}
+            <select aria-label={t('Limite de pontos no mapa', 'Map point limit')} value={mapLimit} onChange={(e) => setMapLimit(Number(e.target.value))} className="rounded border border-white/15 bg-[#070b12] px-2 py-1 font-mono">
+              <option value={2500}>{t('Top 2.500 (Rápido)', 'Top 2,500 (Fast)')}</option>
+              <option value={5000}>{t('Top 5.000 (Padrão)', 'Top 5,000 (Default)')}</option>
+              <option value={10000}>{t('Top 10.000', 'Top 10,000')}</option>
+              <option value={0}>{t('Todos os pontos', 'All points')}</option>
+            </select>
+          </label>
+          <MetricInfo term={t('Limite de Renderização WebGL (LOD)', 'WebGL Point Limit (LOD)')}>
+            {t(
+              'Prioriza na placa de vídeo as células de 1° com maior intensidade térmica para manter 60 FPS no Globo 3D / Mapa 2D. Os cálculos estatísticos e o CSV sempre processam 100% das células.',
+              'Prioritizes the highest-intensity 1° cells on the GPU to maintain 60 FPS on the 3D Globe / 2D Map. All statistical calculations and CSV exports always process 100% of cells.',
+            )}
+          </MetricInfo>
+        </div>
         {compare && <label className="flex items-center gap-2"><input type="checkbox" checked={syncCamera} onChange={(e) => setSyncCamera(e.target.checked)} />{t('Sincronizar câmeras', 'Sync cameras')}</label>}
         <label className="flex items-center gap-2"><input type="checkbox" checked={subtractSelection} onChange={(e) => setSubtractSelection(e.target.checked)} />{t('Subtrair da seleção', 'Subtract from selection')}</label>
-        <span>{t('Escala comum', 'Shared scale')}: 0 → {number(max)} · {mapA?.unit ?? ''}</span>
+        <span className="inline-flex items-center">
+          <span>{t('Escala comum', 'Shared scale')}: 0 → {number(max)} · {mapA?.unit ?? ''}</span>
+          <MetricInfo term={t('Escala Comum do Mapa', 'Shared Map Scale')}>
+            {t(
+              'Indica o valor máximo do domínio de cores entre o Mapa A e o Mapa B, garantindo que a mesma cor represente a mesma magnitude física em ambos os mapas.',
+              'Shows the maximum color domain value shared across Map A and Map B so the same color represents the exact same physical magnitude on both viewports.',
+            )}
+          </MetricInfo>
+        </span>
         {mode.startsWith('heat') && <>
           <span role="img" aria-label={t('Branco → amarelo → laranja → vermelho', 'White → yellow → orange → red')} className="h-2 w-24 rounded" style={{ backgroundImage: FIRE_COLOR_GRADIENT }} />
           <label className="flex items-center gap-2">{t('Opacidade', 'Opacity')}<input aria-label={t('Opacidade', 'Opacity')} type="range" min="0.2" max="1" step="0.1" value={opacity} onChange={(e) => setOpacity(Number(e.target.value))} /></label>
         </>}
       </div>
+      {forecastMapHorizon && forecast?.available && (
+        <div className="mx-4 mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-orange-400/50 bg-orange-500/15 px-3 py-2 text-xs text-orange-100">
+          <div className="flex flex-wrap items-center gap-2 font-mono">
+            <span>
+              🔮 {t('MODO PREVISÃO F₂ NO MAPA:', 'F₂ FORECAST MODE ON MAP:')} t+{forecastMapHorizon}{' '}
+              ({forecast.forecasts.find((f) => f.horizon === forecastMapHorizon)?.target_date ?? reference})
+            </span>
+            <div className="inline-flex gap-1">
+              {[1, 2, 3, 4].map((h) => (
+                <button
+                  key={h}
+                  type="button"
+                  onClick={() => setForecastMapHorizon(h)}
+                  className={`rounded border px-2 py-0.5 text-[10px] font-bold ${
+                    forecastMapHorizon === h
+                      ? 'border-orange-300 bg-orange-500 text-black'
+                      : 'border-white/20 bg-black/40 text-orange-200 hover:border-orange-300'
+                  }`}
+                >
+                  t+{h}
+                </button>
+              ))}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setForecastMapHorizon(null)}
+            className="rounded border border-white/25 bg-black/50 px-2.5 py-1 font-mono text-[11px] text-white hover:bg-black/80"
+          >
+            ✕ {t('Voltar às observações históricas', 'Return to historical observations')}
+          </button>
+        </div>
+      )}
       {mapError && <p role="alert" className="px-4 py-3 text-sm text-amber-200">{mapError}</p>}
       {mapLoading && <p role="status" className="px-4 pb-2 text-xs text-purple-200">{t('Carregando o período histórico…', 'Loading the historical period…')}</p>}
       <div className={`grid gap-px bg-slate-700 ${compare ? 'lg:grid-cols-2' : 'grid-cols-1'}`}>
         {(['A', ...(compare ? ['B'] : [])] as Array<'A' | 'B'>).map((side) => {
           const sideMap = side === 'A' ? mapA : mapB
-          const sideHotspots = side === 'A' ? hotspotsA : hotspotsB
+          const activeForecastPts = side === 'A' && forecastHotspots ? forecastHotspots : null
+          const sideHotspots = activeForecastPts ?? (side === 'A' ? hotspotsA : hotspotsB)
           return (
             <div key={side} className="relative h-[52vh] min-h-[350px] bg-[#070b12]">
               <p className="pointer-events-none absolute top-3 left-3 z-10 rounded-lg bg-[#070b12]/90 px-3 py-2 font-mono text-xs">
-                {side}: {side === 'A' ? (compare ? year : mapSubtitle) : yearB} · {number(sideHotspots.length)} / {number(sideMap?.points.length ?? 0)} {t('células', 'cells')}
+                {activeForecastPts
+                  ? `🔮 F₂ t+${forecastMapHorizon} (${forecast?.forecasts.find((f) => f.horizon === forecastMapHorizon)?.target_date ?? reference}) · ${number(sideHotspots.length)} ${t('células previstas', 'predicted cells')}`
+                  : `${side}: ${side === 'A' ? (compare ? year : mapSubtitle) : yearB} · ${number(sideHotspots.length)} / ${number(sideMap?.points.length ?? 0)} ${t('células', 'cells')}`}
               </p>
-              <div className={`h-full ${mapLoading ? 'opacity-40' : ''}`}>{mapView(sideHotspots)}</div>
+              <div className={`h-full ${mapLoading && !activeForecastPts ? 'opacity-40' : ''}`}>{mapView(sideHotspots)}</div>
             </div>
           )
         })}
@@ -386,12 +467,119 @@ export function Dashboard() {
     {analysisError && <p role="alert" className="rounded-xl border border-amber-300/25 bg-amber-500/10 p-4 text-sm text-amber-100">{analysisError}</p>}
     {analysis && !analysisLoading && <>
       <Panel eyebrow={t('Resumo do recorte completo', 'Full selection summary')} title={`${selectionLabel}${filters.point_ids.length ? ` · ${number(filters.point_ids.length)} ${t('pontos', 'points')}` : ''}`} info={<div className="space-y-2">{analysis.notices.map((notice) => <p key={notice}>{notice}</p>)}<p>{t('Os totais incluem todos os elementos selecionados. Uma célula de 1° pode conter dados de mais de um país. Valores de sensores distintos não são incêndios independentes.', 'Totals include every selected element. A 1° cell can contain records from more than one country. Values from different sensors are not independent fires.')}</p></div>}>
-        <dl className="grid grid-cols-2 gap-3 px-4 pb-4 md:grid-cols-4"><div><dt className="text-xs text-slate-400">{t('Valor do recorte', 'Selection value')}</dt><dd className="mt-1 font-mono text-xl">{analysis.totals.value == null ? '—' : number(analysis.totals.value)}</dd><p className="mt-1 text-[10px] text-slate-400">{analysis.unit}</p></div><div><dt className="text-xs text-slate-400">{t('Células analisadas', 'Analyzed cells')}</dt><dd className="mt-1 font-mono text-xl">{number(analysis.processed_count)}</dd></div><div><dt className="text-xs text-slate-400">{t('Sem registros no recorte', 'No records in selection')}</dt><dd className="mt-1 font-mono text-xl">{number(analysis.missing_count)}</dd></div><div><dt className="text-xs text-slate-400">{t('Períodos retornados', 'Returned periods')}</dt><dd className="mt-1 font-mono text-xl">{number(analysis.timeseries.length)}</dd></div></dl>
+        <dl className="grid grid-cols-2 gap-3 px-4 pb-4 md:grid-cols-4 lg:grid-cols-6">
+          <div>
+            <dt className="flex items-center text-xs text-slate-400">
+              <span>{t('Valor do recorte', 'Selection value')}</span>
+              <MetricInfo term={t('Valor do Recorte (Métrica Ativa)', 'Selection Value (Active Metric)')}>
+                {t(
+                  'Soma total da métrica principal atualmente selecionada no filtro superior para todo o período, país/células e sensores ativos.',
+                  'Total sum of the currently selected primary metric across the entire active date range, country/cells, and sensors.',
+                )}
+              </MetricInfo>
+            </dt>
+            <dd className="mt-1 font-mono text-xl">{analysis.totals.value == null ? '—' : number(analysis.totals.value)}</dd>
+            <p className="mt-1 text-[10px] text-slate-400">{analysis.unit}</p>
+          </div>
+          <div>
+            <dt className="flex items-center text-xs text-slate-400">
+              <span>{t('Detecções agrupadas', 'Merged detections')}</span>
+              <MetricInfo term={t('Total de Detecções Sub-pixel', 'Total Sub-pixel Detections')}>
+                {t(
+                  'Quantidade total de passagens orbitais de fogo ativo (375 m no VIIRS e 1 km no MODIS) registradas dentro das células de 1 km deste recorte.',
+                  'Total count of active-fire orbital satellite passes (375 m VIIRS / 1 km MODIS) merged inside the 1 km cells of this selection.',
+                )}
+              </MetricInfo>
+            </dt>
+            <dd className="mt-1 font-mono text-xl">{number(analysis.totals.detections)}</dd>
+          </div>
+          <div>
+            <dt className="flex items-center text-xs text-slate-400">
+              <span>{t('Soma de FRP (MW)', 'FRP Sum (MW)')}</span>
+              <MetricInfo term={t('Soma de Potência Radiativa do Fogo (MW)', 'Total Fire Radiative Power (MW)')}>
+                {t(
+                  'Soma acumulada de FRP (em Megawatts) medida pelos radiômetros orbitais no recorte. Indica a magnitude da energia radiante liberada pela combustão.',
+                  'Cumulative Fire Radiative Power (in Megawatts) measured by orbital radiometers in this selection. Reflects total radiant heat intensity.',
+                )}
+              </MetricInfo>
+            </dt>
+            <dd className="mt-1 font-mono text-xl">{number(analysis.totals.frp)}</dd>
+          </div>
+          <div>
+            <dt className="flex items-center text-xs text-slate-400">
+              <span>{t('Células analisadas', 'Analyzed cells')}</span>
+              <MetricInfo term={t('Células de 1° com Fogo Registrado', '1° Cells with Recorded Fire')}>
+                {t(
+                  'Quantidade de células terrestres de 1°×1° do recorte que apresentaram pelo menos um registro de anomalia térmica no período filtrado.',
+                  'Count of 1°×1° land cells in the selection that recorded at least one thermal anomaly during the filtered period.',
+                )}
+              </MetricInfo>
+            </dt>
+            <dd className="mt-1 font-mono text-xl">{number(analysis.processed_count)}</dd>
+          </div>
+          <div>
+            <dt className="flex items-center text-xs text-slate-400">
+              <span>{t('Sem registros no recorte', 'No records in selection')}</span>
+              <MetricInfo term={t('Células de 1° sem Registros no Período', '1° Cells with Zero Records')}>
+                {t(
+                  'Células terrestres de 1°×1° pertencentes ao país ou seleção que tiveram zero detecções no período filtrado.',
+                  '1°×1° land cells belonging to the country or selection that had zero recorded detections during the filtered period.',
+                )}
+              </MetricInfo>
+            </dt>
+            <dd className="mt-1 font-mono text-xl">{number(analysis.missing_count)}</dd>
+          </div>
+          <div>
+            <dt className="flex items-center text-xs text-slate-400">
+              <span>{t('Períodos retornados', 'Returned periods')}</span>
+              <MetricInfo align="right" term={t('Passos Temporais na Série', 'Returned Time Steps')}>
+                {t(
+                  'Quantidade de pontos no tempo (anos, meses, semanas ou dias, conforme o agrupamento escolhido) retornados para construir o gráfico da Série Temporal.',
+                  'Number of time steps (years, months, weeks, or days, depending on chosen aggregation) returned to plot the Historical Time Series.',
+                )}
+              </MetricInfo>
+            </dt>
+            <dd className="mt-1 font-mono text-xl">{number(analysis.timeseries.length)}</dd>
+          </div>
+        </dl>
         {analysis.coverage.partial && <p className="px-4 pb-3 text-xs text-amber-200">{t('Disponibilidade parcial. Zero registrado e ausência de dados têm interpretações diferentes.', 'Partial availability. Recorded zero and missing data have different meanings.')}</p>}
       </Panel>
-      <div className="grid min-w-0 items-start gap-4 xl:grid-cols-2"><CalendarChart data={analysis} selectedMonth={selectedMonth} onMonth={selectMonth} /><div className="min-w-0 space-y-4"><HistoryChart data={analysis} selectedMonth={selectedMonth} onMonth={selectMonth} /><SelectionForecast data={forecast} loading={forecastLoading} error={forecastError} reference={reference} onReference={setReference} /></div></div>
+      <div className="grid min-w-0 items-start gap-4 xl:grid-cols-2">
+        <CalendarChart
+          data={analysis}
+          selectedMonth={selectedMonth}
+          onMonth={selectMonth}
+          onSelectDayRange={(dateStr) => {
+            if (dateStr >= '2024-01-01') setReference(dateStr)
+          }}
+        />
+        <div className="min-w-0 space-y-4">
+          <HistoryChart data={analysis} selectedMonth={selectedMonth} onMonth={selectMonth} />
+          <SelectionForecast
+            data={forecast}
+            loading={forecastLoading}
+            error={forecastError}
+            reference={reference}
+            onReference={setReference}
+            filterEndDate={filters.end_date}
+            forecastMapHorizon={forecastMapHorizon}
+            onForecastMapHorizonChange={setForecastMapHorizon}
+          />
+        </div>
+      </div>
     </>}
-    {(!analysis || analysisLoading) && <SelectionForecast data={forecast} loading={forecastLoading} error={forecastError} reference={reference} onReference={setReference} />}
+    {(!analysis || analysisLoading) && (
+      <SelectionForecast
+        data={forecast}
+        loading={forecastLoading}
+        error={forecastError}
+        reference={reference}
+        onReference={setReference}
+        filterEndDate={filters.end_date}
+        forecastMapHorizon={forecastMapHorizon}
+        onForecastMapHorizonChange={setForecastMapHorizon}
+      />
+    )}
     <footer className="rounded-xl border border-white/10 p-3 text-[11px] text-slate-400"><div className="flex flex-wrap items-center justify-between gap-2"><p>BAT (Brightness Anomaly Tracker) · NASA FIRMS / EOSDIS · MODIS C6.1 · VIIRS 375 m</p><InfoToggle label={t('Informações: fontes e limitações', 'Information: sources and limitations')}>{t('0 significa sem detecção registrada nos arquivos disponíveis; não comprova ausência de fogo ou céu limpo. Um registro não é um incêndio único. F₂ é uma projeção estatística experimental da equipe, não uma previsão oficial da NASA. Métricas, disponibilidade e métodos são identificados em cada painel.', '0 means no registered detection in the available files; it does not prove absence of fire or clear skies. One record is not one unique fire. F₂ is the team’s experimental statistical projection, not an official NASA forecast. Metrics, availability and methods are identified in each panel.')}</InfoToggle></div></footer>
     <ChatAssistant query={query} referenceDate={reference} focus={focus} onCoordinate={coordinate} />
   </main>

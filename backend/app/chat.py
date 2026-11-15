@@ -72,8 +72,43 @@ INJECTION_PATTERNS = re.compile(
 )
 
 OFF_TOPIC_PATTERNS = re.compile(
-    r"\b(receita\s+de\s+bolo|piada|hor[oó]scopo|futebol|campeonato\s+brasileiro|"
-    r"bitcoin|criptomoeda|namoro|poema|poesia|filme\s+da\s+netflix)\b",
+    r"\b(receita|bolo|culin[aá]ria|piada|joke|jokes|funny|hor[oó]scopo|signo|"
+    r"futebol|campeonato|copa\s+do\s+mundo|flamengo|corinthians|palmeiras|neymar|messi|"
+    r"bitcoin|criptomoeda|crypto|namoro|poema|poesia|m[uú]sica|filme|netflix|novela|bbb|"
+    r"lula|bolsonaro|trump|biden|elei[cç][aã]o|pol[ií]tica|partido|presidente|prefeito|deputado|senador|"
+    r"camiseta|camisa|cal[cç]a|roupa|sapato|vestido|carro|moto|videogame|minecraft|fortnite|gta|"
+    r"fofoca|celebridade|religi[aã]o|igreja|loteria|mega\s*sena|tigrinho|aposta|bet)\b",
+    re.IGNORECASE,
+)
+
+SYSTEM_GUIDE_PATTERNS = re.compile(
+    r"\b(como\s+(eu\s+)?(utilizo|utilizar|uso|usar|mexo|mexer|funciona|navego|navegar|filtro|filtrar|seleciono|selecionar|exporto|exportar|baixo|baixar|vejo|ver|interpreto|interpretar)|"
+    r"how\s+(do\s+i\s+|to\s+|can\s+i\s+|does\s+(it|this)\s+)(use|work|navigate|filter|select|export|download|view|interpret|read)|"
+    r"o\s+que\s+([eé]|s[aã]o|significa|quer\s+dizer)|what\s+(is|are|does|mean)|para\s+que\s+serve|"
+    r"explica|explique|explain|ajuda|help|tutorial|guia|manual|instru[cç][oõ]es|"
+    r"esse\s+site|este\s+site|this\s+site|this\s+platform|plataforma|dashboard|painel|interface|ferramenta|"
+    r"calend[aá]rio|calendar|s[eé]rie\s+temporal|time\s+series|mapa|map|globo|globe|"
+    r"m[eé]trica|metric|sensor|sensores|modis|viirs|snpp|jpss|noaa|harmoniz|z-?score|csv|ctrl|shift)\b",
+    re.IGNORECASE,
+)
+
+DATA_DOMAIN_PATTERNS = re.compile(
+    r"\b(queimada|queimadas|fogo|inc[eê]ndio|inc[eê]ndios|foco|focos|anomalia|anomalias|calor|brilho|temperatura|t[eé]rmic|"
+    r"frp|pot[eê]ncia|radiativ|registro|registros|detec[cç][aã]o|detec[cç][oõ]es|c[eé]lula|c[eé]lulas|ponto|pontos|pixel|"
+    r"pico|pior|maior|menor|total|totais|quantos|quantas|resumo|hist[oó]rico|s[eé]rie|estat[ií]stica|dados|status|situa[cç][aã]o|"
+    r"previs[aã]o|proje[cç][aã]o|f2|f0|f₂|f₀|climatolog|risco|alerta|futuro|horizonte|"
+    r"semana|semanas|m[eê]s|meses|ano|anos|dia|dias|per[ií]odo|data|ontem|hoje|recente|últim|ultim|"
+    r"coordenada|lat|lon|latitude|longitude|gps|regi[aã]o|localiza[cç][aã]o|onde\s+estou|perto\s+de\s+mim|aqui|"
+    r"amaz[oô]nia|cerrado|pantanal|mata\s+atl[aâ]ntica|caatinga|pampa|boreal|tr[oó]pico|temperado|mundo|global|world|planeta|pa[ií]s|"
+    r"fire|fires|burn|burning|wildfire|hotspot|hotspots|anomaly|anomalies|brightness|thermal|"
+    r"record|records|detection|detections|cell|cells|peak|worst|highest|lowest|summary|history|data|forecast|projection|risk|alert|future|"
+    r"week|weeks|month|months|year|years|day|days|period|date|recent|last|coordinate|region|location|near\s+me|"
+    r"200\d|201\d|202[0-7])\b",
+    re.IGNORECASE,
+)
+
+GREETING_PATTERNS = re.compile(
+    r"^\s*(oi|ol[aá]|bom\s+dia|boa\s+tarde|boa\s+noite|hello|hi|hey|tudo\s+bem|obrigad[oa]|valeu|thanks|thank\s+you)[!?.]*\s*$",
     re.IGNORECASE,
 )
 
@@ -186,25 +221,85 @@ def extract_coordinates_from_text(text: str) -> tuple[float, float] | None:
     return None
 
 
+def detect_message_locale(message: str, default_locale: str = "en") -> str:
+    """Detecta se a mensagem do usuário está em PT-BR ou EN para responder no mesmo idioma."""
+    text = message.lower()
+    if re.search(r"[ãõçáéíóúâêô]", text):
+        return "pt-BR"
+    pt_words = len(re.findall(
+        r"\b(o\s+que|significa|para\s+que|serve|como|qual|quais|quem|onde|quando|porque|por\s+que|utilizo|usar|esse|este|site|camiseta|piada|queimada|queimadas|fogo|inc[eê]ndio|brasil|gr[aá]fico|calend[aá]rio|previs[aã]o|m[eé]trica|explica|explique|ajuda|ol[aá]|oi|bom\s+dia|boa\s+tarde|boa\s+noite|voc[eê]|n[aã]o|est[aá]|c[eé]lula|m[eê]s|ano|anos|dias|semana|semanas|dados|resumo|mapa|globo|filtrar|selecionar|exportar)\b",
+        text,
+    ))
+    en_words = len(re.findall(
+        r"\b(how|what|where|when|why|who|which|use|this|tell|joke|shirt|fire|fires|chart|charts|calendar|forecast|metric|metrics|explain|help|hello|hi|are|is|the|for|from|week|weeks|days|month|year|years|summary|data|filter|select|export)\b",
+        text,
+    ))
+    if pt_words > en_words:
+        return "pt-BR"
+    if en_words > pt_words:
+        return "en"
+    return default_locale
+
+
+def classify_intent(message: str) -> str:
+    """Classifica a intenção da pergunta em 'off_topic', 'greeting', 'system_guide' ou 'data_query'."""
+    text = message.strip()
+    if not text:
+        return "empty"
+    if INJECTION_PATTERNS.search(text) or OFF_TOPIC_PATTERNS.search(text):
+        return "off_topic"
+    norm_text = _norm(text)
+    if GREETING_PATTERNS.match(norm_text):
+        return "greeting"
+
+    has_coords = extract_coordinates_from_text(text) is not None
+    has_country = resolve_country_from_text(text, fallback_country=None) is not None
+    has_month = any(re.search(rf"\b{m}\b", norm_text) for m in MONTH_NAMES_PT)
+    has_data_kw = bool(DATA_DOMAIN_PATTERNS.search(text) or DATA_DOMAIN_PATTERNS.search(norm_text))
+    has_guide_kw = bool(SYSTEM_GUIDE_PATTERNS.search(text) or SYSTEM_GUIDE_PATTERNS.search(norm_text))
+
+    # Se pergunta explicitamente como utilizar o site / plataforma / gráficos sem pedir dados específicos de país/ano/coordenada
+    asks_how_to_use = bool(
+        re.search(
+            r"\b(como\s+(eu\s+)?(utilizo|utilizar|uso|usar|mexo|mexer|funciona|navego|navegar|interpreto|interpretar|filtro|filtrar|seleciono|selecionar|exporto|exportar)|"
+            r"how\s+(do\s+i\s+|to\s+|can\s+i\s+|does\s+(it|this)\s+)(use|work|navigate|interpret|filter|select|export)|"
+            r"o\s+que\s+([eé]|s[aã]o|significa|quer\s+dizer)|what\s+(is|are|does|mean)|para\s+que\s+serve|ajuda|help|tutorial|guia)\b",
+            norm_text,
+        )
+    )
+    if asks_how_to_use and not (has_coords or has_country):
+        return "system_guide"
+
+    if has_coords or has_country or has_month or has_data_kw:
+        return "data_query"
+
+    if has_guide_kw:
+        return "system_guide"
+
+    return "off_topic"
+
+
 def guardrails_precheck(message: str, locale: str = "en") -> dict[str, Any] | None:
-    """Camada 1 do Guardrail: bloqueio rápido em Python sem custo de LLM."""
+    """Camada 1 do Guardrail: bloqueio rápido em Python para perguntas fora do escopo do BAT."""
+    eff_locale = detect_message_locale(message, locale)
     text = message.strip()
     if not text:
         return {
             "blocked": True,
             "reply": (
-                "Envie uma pergunta sobre o BAT (Brightness Anomaly Tracker)."
-                if locale == "pt-BR"
-                else "Please send a question about BAT (Brightness Anomaly Tracker)."
+                "Envie uma pergunta sobre o **BAT (Brightness Anomaly Tracker)**."
+                if eff_locale == "pt-BR"
+                else "Please send a question about **BAT (Brightness Anomaly Tracker)**."
             ),
         }
-    if INJECTION_PATTERNS.search(text) or OFF_TOPIC_PATTERNS.search(text):
+    intent = classify_intent(text)
+    if intent == "off_topic":
         return {
             "blocked": True,
             "reply": (
                 "Sou o assistente exclusivo do **BAT (Brightness Anomaly Tracker)**. "
-                "Respondo apenas dúvidas sobre a plataforma, gráficos e consultas de anomalias térmicas/queimadas."
-                if locale == "pt-BR"
+                "Respondo apenas dúvidas sobre como usar a plataforma, interpretação dos gráficos/métricas e dados ou previsões de anomalias térmicas/queimadas."
+                if eff_locale == "pt-BR"
                 else "I am the dedicated **BAT (Brightness Anomaly Tracker)** assistant. "
                 "I only answer questions about the platform, charts, and fire/brightness anomaly data."
             ),
@@ -475,6 +570,11 @@ def gather_grounding_context(
     Analisa a pergunta do usuário e o estado da UI para executar em milissegundos
     as ferramentas de dados pertinentes antes de redigir a resposta.
     """
+    eff_locale = detect_message_locale(message, locale)
+    intent = classify_intent(message)
+    if intent in ("greeting", "off_topic", "empty"):
+        return intent, []
+
     ui = ui_context or {}
     norm_msg = _norm(message)
     executed_tools: list[dict[str, Any]] = []
@@ -484,6 +584,11 @@ def gather_grounding_context(
     ui_start = ui.get("start_date") or "2000-01-01"
     ui_end = ui.get("end_date") or "2025-12-31"
     ui_ref = ui.get("reference_date") or "2025-12-22"
+
+    # Se a intenção principal é guia de uso da plataforma ("como utilizo esse site?", "o que é FRP?", etc.),
+    # não injeta o resumo numérico global para não poluir a resposta com estatísticas não solicitadas.
+    if intent == "system_guide":
+        return "system_guide", []
 
     # 1. Coordenada explícita no texto ou pergunta sobre "minha região / minha localização / onde estou"
     coords = extract_coordinates_from_text(message)
@@ -497,10 +602,11 @@ def gather_grounding_context(
             coords = (float(ui["focus_lat"]), float(ui["focus_lon"]))
 
     if coords:
-        executed_tools.append(tool_query_coordinate_or_region(coords[0], coords[1], locale))
+        executed_tools.append(tool_query_coordinate_or_region(coords[0], coords[1], eff_locale))
 
     # 2. País mencionado no texto (ou país selecionado na tela)
-    target_country = resolve_country_from_text(message, fallback_country=ui_country)
+    explicit_country = resolve_country_from_text(message, fallback_country=None)
+    target_country = explicit_country if explicit_country is not None else (None if re.search(r"\b(mundo|global|world|planeta)\b", norm_msg) else ui_country)
 
     # 3. Pergunta sobre "últimos X dias / última semana / resumo recente"
     days_match = re.search(r"\b(?:ultimos|ultimas|last|recent)\s*(\d{1,2})?\s*(dias|day|days|semanas|week|weeks)\b", norm_msg)
@@ -510,7 +616,19 @@ def gather_grounding_context(
         days_count = num * 7 if "sem" in unit_word or "week" in unit_word else num
         executed_tools.append(tool_get_recent_or_weekly_summary(country=target_country, days_or_weeks=days_count, end_date_str=ui_end))
 
-    # 4. Pergunta sobre histórico, ano específico, comparativo ou resumo de país/região
+    # 4. Pergunta sobre previsão / F2 / próximas semanas / risco futuro
+    asks_forecast = bool(re.search(r"\b(f2|f0|f₂|f₀|previs[aã]o|proje[cç][aã]o|proximas?\s+semanas?|futuro|risco|forecast|horizonte)\b", norm_msg))
+    if asks_forecast:
+        executed_tools.append(
+            tool_query_f2_selection(
+                country=target_country,
+                point_ids=ui_points if target_country == ui_country else [],
+                reference_date=ui_ref,
+                locale=eff_locale,
+            )
+        )
+
+    # 5. Pergunta sobre histórico, ano específico, comparativo ou resumo de país/região
     years_found = [int(m.group(0)) for m in re.finditer(r"\b(200\d|201\d|202[0-5])\b", message)]
     asks_data = bool(
         re.search(
@@ -518,7 +636,7 @@ def gather_grounding_context(
             norm_msg,
         )
     )
-    if asks_data or target_country != ui_country or years_found:
+    if (asks_data or explicit_country is not None or years_found) and not (asks_forecast and not asks_data and not years_found):
         if years_found:
             y_min, y_max = min(years_found), max(years_found)
             s_date, e_date = f"{y_min}-01-01", f"{y_max}-12-31"
@@ -535,41 +653,29 @@ def gather_grounding_context(
                 end_date=e_date,
                 resolution=res_mode,
                 metric=ui.get("metric") or "records",
-                locale=locale,
+                locale=eff_locale,
             )
         )
 
-    # 5. Pergunta sobre previsão / F2 / próximas semanas / risco futuro
-    if re.search(r"\b(f2|f0|previs[aã]o|proje[cç][aã]o|proximas?\s+semanas?|futuro|risco|forecast|horizonte)\b", norm_msg):
-        executed_tools.append(
-            tool_query_f2_selection(
-                country=target_country,
-                point_ids=ui_points if target_country == ui_country else [],
-                reference_date=ui_ref,
-                locale=locale,
-            )
-        )
-
-    # Se nenhuma tool específica disparou mas há estado na UI, inclui resumo leve do recorte atual da tela
-    if not executed_tools:
+    # Se é data_query mas nenhuma tool específica disparou, consulta o resumo atual da seleção
+    if not executed_tools and intent == "data_query":
         executed_tools.append(
             tool_query_historical_summary(
-                country=ui_country,
+                country=target_country,
                 point_ids=ui_points[:50],
                 start_date=ui_start,
                 end_date=ui_end,
                 resolution="yearly",
                 metric=ui.get("metric") or "records",
-                locale=locale,
+                locale=eff_locale,
             )
         )
 
-    intent = "data_query" if len(executed_tools) > 0 else "system_guide"
     return intent, executed_tools
 
 
 # ============================================================================
-# INTEGRAÇÃO COM A API DA GROQ (LLAMA 3.3 70B / 3.1 8B) + FALLBACK LOCAL
+# INTEGRAÇÃO COM A API DA GROQ + FALLBACK LOCAL DETERMINÍSTICO
 # ============================================================================
 
 def call_groq_chat(
@@ -587,19 +693,20 @@ def call_groq_chat(
     if not api_key:
         return None, "no_api_key"
 
+    eff_locale = detect_message_locale(message, locale)
     lang_instruction = (
-        "Responda SEMPRE em Português (PT-BR) de forma MUITO CURTA, direta e objetiva (máximo de 3 a 4 tópicos curtos ou 80 palavras)."
-        if locale == "pt-BR"
-        else "ALWAYS respond in English in a VERY SHORT, direct, and concise style (maximum 3–4 short bullet points or ~80 words)."
+        "Responda SEMPRE em Português (PT-BR) de forma MUITO CURTA, direta e objetiva (máximo de 3 a 4 tópicos curtos ou 90 palavras)."
+        if eff_locale == "pt-BR"
+        else "ALWAYS respond in English in a VERY SHORT, direct, and concise style (maximum 3–4 short bullet points or ~90 words)."
     )
 
     system_prompt = f"""You are the **Official Assistant for BAT (Brightness Anomaly Tracker, 2000–2025)**.
 {lang_instruction}
 
 ### STRICT GUARDRAIL & BREVITY RULES:
-1. **Brevity:** Keep answers brief and factual (max 3–4 short bullets, under 90 words). Do NOT include long introductions or unrequested methodology lectures.
-2. **Exclusive Scope:** Only answer questions about BAT (controls, 2D/3D map, point selection vs Ctrl+Click country selection, CSV export, Calendar/Series/F₂ charts, or fire/anomaly data by country, period, or coordinate). Refuse off-topic questions in 1 sentence.
-3. **Zero Hallucination:** Use ONLY numbers from `DATABASE GROUNDING DATA` below (archive covers `2000-01-01` to `2025-12-31`).
+1. **Brevity:** Keep answers brief and factual (max 3–4 short bullets, under 95 words). Do NOT include long introductions.
+2. **Exclusive Scope:** Only answer questions about BAT (how to use the site/controls, 2D/3D map, point selection vs Ctrl+Click country selection, CSV export, Calendar year->month->day drilldown, Time Series, Model F₂/F₀ forecast & map projection, metrics/sensors, or fire/anomaly data by country, period, or coordinate). If the user asks an off-topic question (politics, clothes, celebrities, jokes, recipes, sports, etc.), refuse in 1 sentence: "Sou o assistente exclusivo do BAT (Brightness Anomaly Tracker) e respondo apenas sobre a plataforma, gráficos e dados de anomalias térmicas/queimadas." (or in English).
+3. **Zero Hallucination:** When reporting data, use ONLY numbers from `DATABASE GROUNDING DATA` below (archive covers `2000-01-01` to `2025-12-31`, with F₂ forecast into `2026`). If the user is asking HOW to use the site or what a metric/chart means, explain the functionality clearly without dumping unrequested global statistics.
 
 ---
 ### SYSTEM GUIDE:
@@ -625,7 +732,13 @@ def call_groq_chat(
             messages_payload.append({"role": role, "content": content[:600]})
     messages_payload.append({"role": "user", "content": message.strip()[:500]})
 
-    for model_name in (GROQ_PRIMARY_MODEL, GROQ_FALLBACK_MODEL, GROQ_THIRD_MODEL):
+    for model_name in (
+        GROQ_PRIMARY_MODEL,
+        GROQ_FALLBACK_MODEL,
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant",
+        GROQ_THIRD_MODEL,
+    ):
         payload = json.dumps(
             {
                 "model": model_name,
@@ -646,7 +759,7 @@ def call_groq_chat(
             method="POST",
         )
         try:
-            with urllib.request.urlopen(req, timeout=25) as resp:
+            with urllib.request.urlopen(req, timeout=20) as resp:
                 body = json.loads(resp.read().decode("utf-8"))
                 raw_reply = (body["choices"][0]["message"].get("content") or "").strip()
                 reply = re.sub(r"<think>.*?</think>", "", raw_reply, flags=re.DOTALL).strip()
@@ -670,10 +783,81 @@ def build_local_grounded_reply(
     reason: str = "no_api_key",
 ) -> str:
     """
-    Motor determinístico local conciso (PT-BR / EN) usando os dados reais consultados no SQLite/Catálogo.
+    Motor determinístico local conciso (PT-BR / EN) usando os dados reais consultados no SQLite/Catálogo
+    e o guia interativo da plataforma quando a pergunta é sobre uso/interpretação.
     """
+    eff_locale = detect_message_locale(message, locale)
     norm_msg = _norm(message)
-    is_pt = locale == "pt-BR"
+    is_pt = eff_locale == "pt-BR"
+    intent = classify_intent(message)
+
+    if intent == "off_topic":
+        return (
+            "Sou o assistente exclusivo do **BAT (Brightness Anomaly Tracker)**. "
+            "Respondo apenas dúvidas sobre como usar a plataforma, interpretação dos gráficos/métricas e dados ou previsões de anomalias térmicas/queimadas."
+            if is_pt
+            else "I am the dedicated **BAT (Brightness Anomaly Tracker)** assistant. "
+            "I only answer questions about the platform, charts, and fire/brightness anomaly data."
+        )
+
+    if intent == "greeting":
+        return (
+            "Olá! Sou o assistente do **BAT (Brightness Anomaly Tracker, 2000–2025)**. Posso explicar como usar o site, detalhar cada métrica/gráfico ou consultar dados históricos e previsões $F_2$ por país, período ou coordenada `(lat, lon)`."
+            if is_pt
+            else "Hello! I am the **BAT (Brightness Anomaly Tracker, 2000–2025)** assistant. I can explain how to use the platform, detail each metric/chart, or query historical records and $F_2$ forecasts by country, period, or coordinate `(lat, lon)`."
+        )
+
+    if intent == "system_guide" or not grounding_data:
+        if re.search(r"\b(f2|f0|f₂|f₀|previs[aã]o|proje[cç][aã]o|forecast)\b", norm_msg):
+            return (
+                "### 🔮 Como funciona a Previsão ($F_2$ / $F_0$)\n"
+                "- **Escolha a data de referência:** Selecione qualquer semana em `2024–2026` no painel **Projeção Experimental $F_2$**.\n"
+                "- **Horizontes `t+1` a `t+4`:** O modelo projeta 1 a 4 semanas à frente combinando a climatologia sazonal (`2012–2023`, $F_0$) com 6 variáveis físicas (`FRP`, contraste térmico $\\Delta T$, fração noturna, densidade sub-pixel e anomalias recentes).\n"
+                "- **Conexão com o Mapa:** Clique em qualquer card `t+1..t+4` ou em **\"Projetar previsão no Mapa\"** para visualizar os focos previstos diretamente no Globo 3D / Mapa 2D."
+                if is_pt
+                else "### 🔮 How the Forecast ($F_2$ / $F_0$) Works\n"
+                "- **Select a reference date:** Pick any week in `2024–2026` in the **Experimental $F_2$ Forecast** panel.\n"
+                "- **Horizons `t+1` to `t+4`:** Projects 1–4 weeks ahead by combining seasonal climatology (`2012–2023`, $F_0$) with 6 physical drivers (`FRP`, thermal contrast $\\Delta T$, night fraction, sub-pixel density, and recent anomalies).\n"
+                "- **Map Integration:** Click any `t+1..t+4` card or **\"Project forecast on Map\"** to visualize the predicted hotspots directly on the 3D Globe / 2D Map."
+            )
+        if re.search(r"\b(calend[aá]rio|calendar|anomalia|anomaly|z-?score)\b", norm_msg):
+            return (
+                "### 🗓️ Como usar o Calendário do Recorte\n"
+                "- **Navegação Ano → Mês → Dia:** Use os botões **Anos**, **Meses** e **Dias** (ou clique em um ano/mês) para detalhar da visão multianual (`2000–2025`) até os meses do ano e os dias do mês.\n"
+                "- **Modos:**Alterne entre **Intensidade** (valor absoluto), **Anomalia %** (desvio vs média `2003–2023`) e **Z-score** (desvios-padrão $\\sigma$)."
+                if is_pt
+                else "### 🗓️ How to Use the Selection Calendar\n"
+                "- **Year → Month → Day Drill-down:** Use the **Years**, **Months**, and **Days** tabs (or click a year/month) to drill down from the multi-year matrix (`2000–2025`) into months and individual days.\n"
+                "- **Modes:** Switch between **Intensity** (absolute value), **Anomaly %** (deviation vs `2003–2023` baseline), and **Z-score** (standard deviations $\\sigma$)."
+            )
+        if re.search(r"\b(m[eé]trica|metric|frp|records|registro|detections|detec[cç]|sensor|modis|viirs|harmoniz)\b", norm_msg):
+            return (
+                "### 📐 Métricas e Sensores do BAT\n"
+                "- **Registros (`records`):** Células de `1 km × mês × semana ISO × sensor` com fogo ativo.\n"
+                "- **Detecções (`detections`):** Total de passagens sub-pixel (`375 m` VIIRS / `1 km` MODIS) agrupadas.\n"
+                "- **FRP (`MW`):** Soma da Potência Radiativa do Fogo em Megawatts.\n"
+                "- **Sensores:** **MODIS** (`2000–2025`, 1 km), **VIIRS S-NPP** (`2012–2025`, 375 m) e **VIIRS NOAA-20** (`2018–2025`, 375 m). Passe o mouse ou clique nos ícones **(i)** ao lado de cada métrica para ver a explicação completa."
+                if is_pt
+                else "### 📐 BAT Metrics & Sensors\n"
+                "- **Records:** Active `1 km cell × month × ISO week × sensor` entries.\n"
+                "- **Detections:** Total sub-pixel satellite passes (`375 m` VIIRS / `1 km` MODIS) merged into 1 km cells.\n"
+                "- **FRP (`MW`):** Sum of Fire Radiative Power in Megawatts.\n"
+                "- **Sensors:** **MODIS** (`2000–2025`, 1 km), **VIIRS S-NPP** (`2012–2025`, 375 m), and **VIIRS NOAA-20** (`2018–2025`, 375 m). Click the **(i)** icons next to any metric for full details."
+            )
+        return (
+            "### 🧭 Como utilizar o BAT (Brightness Anomaly Tracker)\n"
+            "- **1. Filtros e País (Topo):** Escolha um **País** (ou `🌎 Mundo`), o **Período** (`2000–2025`), o **Agrupamento** (`Anual`, `Mensal`, `Semanal`, `Diário`), a **Métrica** (`Registros`, `Detecções`, `FRP`) e os **Sensores** (`MODIS`, `VIIRS`).\n"
+            "- **2. Mapa 2D / Globo 3D:** **Clique** seleciona uma célula `1°×1°`; **Ctrl+Clique** seleciona o país; **Shift+Arraste** seleciona uma área; **📍 Meu GPS** foca na sua localização.\n"
+            "- **3. Calendário (Ano → Mês → Dia) e Série Temporal:** Analise anomalias sazonais (`2003–2023`), navegue de **Anos** para **Meses** e **Dias**, e exporte os dados em **Exportar CSV**.\n"
+            "- **4. Previsão $F_2$ (`t+1..t+4` semanas):** Escolha a data de referência e clique em **Projetar no Mapa** para visualizar a previsão espacial."
+            if is_pt
+            else "### 🧭 How to Use BAT (Brightness Anomaly Tracker)\n"
+            "- **1. Top Filters & Country:** Select a **Country** (or `🌎 World`), **Date range** (`2000–2025`), **Aggregation** (`Yearly`, `Monthly`, `Weekly`, `Daily`), **Metric** (`Records`, `Detections`, `FRP`), and **Sensors** (`MODIS`, `VIIRS`).\n"
+            "- **2. 2D Map / 3D Globe:** **Click** selects a `1°×1°` cell; **Ctrl+Click** selects its country; **Shift+Drag** selects a bounding box; **📍 My GPS** locates your region.\n"
+            "- **3. Calendar (Year → Month → Day) & Time Series:** Inspect seasonal anomalies (`2003–2023`), drill down from **Years** to **Months** and **Days**, and click **Export CSV**.\n"
+            "- **4. $F_2$ Forecast (`t+1..t+4` weeks):** Pick a reference date and click **Project on Map** to view the spatial forecast."
+        )
+
     parts: list[str] = []
 
     asks_my_region = bool(
@@ -752,23 +936,11 @@ def build_local_grounded_reply(
                     f"- **Active cells:** `{cov.get('active_1deg_cells')}/{cov.get('selected_1deg_cells')}` | **Peak:** {peak_txt}"
                 )
 
-    if re.search(r"\b(grafico|calendario|interpretar|como\s+usar|como\s+faco|filtrar|selecionar|exportar|csv|harmoniza|modis|viirs|f2|f0|mapa|globo|chart|interpret|how\s+to|filter|select|export)\b", norm_msg) and len(parts) <= 1:
-        if is_pt:
-            parts.append(
-                "- **Mapa:** Clique seleciona ponto (`1°`); `Ctrl+Clique` seleciona país; `Shift+Arraste` seleciona área.\n"
-                "- **Gráficos:** Calendário mostra anomalias vs `2003–2023`; Série compara MODIS/VIIRS; $F_2$ projeta `t+1..t+4` semanas."
-            )
-        else:
-            parts.append(
-                "- **Map:** Click selects a `1°` point; `Ctrl+Click` selects its country; `Shift+Drag` selects an area.\n"
-                "- **Charts:** Calendar shows anomalies vs `2003–2023`; Series compares MODIS/VIIRS; $F_2$ projects `t+1..t+4` weeks."
-            )
-
     if not parts:
         parts.append(
-            "Pergunte sobre países, períodos, coordenadas `(lat, lon)` ou gráficos do BAT."
+            "Pergunte sobre como usar o site, gráficos, países, períodos, coordenadas `(lat, lon)` ou previsões $F_2$."
             if is_pt
-            else "Ask about countries, date ranges, coordinates `(lat, lon)`, or BAT charts."
+            else "Ask about how to use the site, charts, countries, date ranges, coordinates `(lat, lon)`, or $F_2$ forecasts."
         )
 
     return "\n\n".join(parts[:2])

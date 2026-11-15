@@ -539,3 +539,151 @@ def _map_scale(country,sensors,metric,months,single_month):
     with _connect() as db:
         value=db.execute('SELECT max(value) FROM (SELECT sum('+_column(metric)+') value FROM '+table+' WHERE '+' AND '.join(clauses)+' GROUP BY '+groups+')',params).fetchone()[0]
     return float(value or 0.)
+
+
+def query_calendar_month(query):
+    """Retorna os valores dia a dia (1..31) de um mês específico para o drill-down Ano -> Mês -> Dia."""
+    year = max(2000, min(2025, int(query.get('year', 2025))))
+    month = max(1, min(12, int(query.get('month', 12))))
+    last_day = calendar.monthrange(year, month)[1]
+    start_str = f'{year:04d}-{month:02d}-01'
+    end_str = f'{year:04d}-{month:02d}-{last_day:02d}'
+
+    q = normalise({
+        'country': query.get('country'),
+        'point_ids': query.get('point_ids') or [],
+        'start_date': start_str,
+        'end_date': end_str,
+        'months': [month],
+        'sensors': query.get('sensors') or list(SENSORS),
+        'metric': query.get('metric') or 'records',
+        'resolution': 'monthly',
+        'locale': query.get('locale') or 'pt-BR',
+    })
+
+    # Primeiro obtém o resumo mensal oficial e a climatologia 2003-2023 daquele mês
+    monthly_res = query_analysis(q)
+    cal_cell = next((c for c in monthly_res.get('calendar', []) if c['year'] == year and c['month'] == month), None)
+    month_total = cal_cell['value'] if cal_cell else None
+    baseline_month = cal_cell['baseline_mean'] if cal_cell else None
+    daily_baseline = (baseline_month / last_day) if (baseline_month is not None and last_day > 0) else None
+
+    # 1. Tenta dados diários exatos quando um país está selecionado e métrica != harmonized
+    if q['country'] and q['metric'] != 'harmonized':
+        try:
+            from app.daily_history import daily_analysis
+            daily_q = {**q, 'resolution': 'daily'}
+            d_res = daily_analysis(daily_q, map_mode=False)
+            ts = d_res.get('timeseries', [])
+            if ts and any(r.get('value') is not None for r in ts):
+                vals = [float(r['value'] or 0.0) for r in ts if r.get('value') is not None]
+                std_d = math.sqrt(sum((x - (daily_baseline or 0.0)) ** 2 for x in vals) / len(vals)) if (vals and daily_baseline is not None) else None
+                days_out = []
+                for idx, row in enumerate(ts, 1):
+                    dt = date.fromisoformat(row['period'][:10])
+                    val = row.get('value')
+                    anom_pct = ((val - daily_baseline) / daily_baseline * 100.0) if (val is not None and daily_baseline and daily_baseline > 0) else None
+                    anom_z = ((val - daily_baseline) / std_d) if (val is not None and daily_baseline is not None and std_d and std_d > 0) else None
+                    days_out.append({
+                        'date': row['period'][:10],
+                        'day': dt.day,
+                        'weekday': dt.weekday(),
+                        'iso_week': dt.isocalendar().week,
+                        'value': round(float(val), 2) if val is not None else None,
+                        'baseline_mean': round(float(daily_baseline), 2) if daily_baseline is not None else None,
+                        'anomaly_pct': round(float(anom_pct), 2) if anom_pct is not None else None,
+                        'anomaly_zscore': round(float(anom_z), 2) if anom_z is not None else None,
+                    })
+                return {
+                    'year': year,
+                    'month': month,
+                    'days_in_month': last_day,
+                    'first_weekday': date(year, month, 1).weekday(),
+                    'source': 'exact_daily',
+                    'unit': d_res.get('unit') or monthly_res.get('unit'),
+                    'resolution_source': 'exact_daily',
+                    'month_total': round(sum(d['value'] or 0 for d in days_out), 2) if any(d['value'] is not None for d in days_out) else None,
+                    'baseline_mean': round(float(baseline_month), 2) if baseline_month is not None else None,
+                    'days': days_out,
+                }
+        except Exception:
+            pass
+
+    # 2. Para Global (Mundo) ou quando não há CSV diário por país, usa o banco semanal indexado (2012-2025)
+    from app.forecast_selection import cache_path as f2_cache_path
+    w_path = f2_cache_path()
+    week_map: dict[tuple[int, int], float] = defaultdict(float)
+    used_weekly = False
+    if 2012 <= year <= 2025 and w_path.is_file():
+        try:
+            with sqlite3.connect(w_path, timeout=15) as wdb:
+                clauses = ['iso_year IN (?, ?, ?)', 'sensor IN (' + ','.join('?' for _ in q['sensors']) + ')']
+                params: list = [year - 1, year, year + 1, *q['sensors']]
+                if q['country']:
+                    clauses.append('country = ?')
+                    params.append(q['country'])
+                if q['point_ids']:
+                    wdb.execute('CREATE TEMP TABLE IF NOT EXISTS cal_pts(point_id TEXT PRIMARY KEY)')
+                    wdb.executemany('INSERT OR IGNORE INTO cal_pts VALUES (?)', [(pid,) for pid in q['point_ids']])
+                    clauses.append('point_id IN (SELECT point_id FROM cal_pts)')
+                col_expr = {
+                    'records': 'SUM(cells)',
+                    'detections': 'SUM(merged)',
+                    'frp': 'SUM(frp)',
+                    'harmonized': 'SUM(cells)',
+                }[q['metric']]
+                for wy, ww, val in wdb.execute(
+                    f"SELECT iso_year, iso_week, {col_expr} FROM weekly WHERE {' AND '.join(clauses)} GROUP BY iso_year, iso_week",
+                    params,
+                ):
+                    if wy is not None and ww is not None and val is not None:
+                        week_map[(int(wy), int(ww))] = float(val)
+                        used_weekly = True
+        except Exception:
+            used_weekly = False
+
+    days_raw: list[tuple[date, float | None]] = []
+    for d_num in range(1, last_day + 1):
+        dt = date(year, month, d_num)
+        iso_y, iso_w, _ = dt.isocalendar()
+        if month_total is None:
+            days_raw.append((dt, None))
+        elif used_weekly:
+            w_val = week_map.get((iso_y, iso_w), week_map.get((year, iso_w), 0.0))
+            days_raw.append((dt, w_val / 7.0))
+        else:
+            days_raw.append((dt, month_total / last_day))
+
+    raw_sum = sum(v for _, v in days_raw if v is not None)
+    scale = (month_total / raw_sum) if (month_total is not None and raw_sum > 0) else 1.0
+    scaled_vals = [(v * scale) for _, v in days_raw if v is not None]
+    std_d = math.sqrt(sum((x - (daily_baseline or 0.0)) ** 2 for x in scaled_vals) / len(scaled_vals)) if (scaled_vals and daily_baseline is not None) else None
+
+    days_out = []
+    for dt, raw_v in days_raw:
+        val = (raw_v * scale) if raw_v is not None else None
+        anom_pct = ((val - daily_baseline) / daily_baseline * 100.0) if (val is not None and daily_baseline and daily_baseline > 0) else None
+        anom_z = ((val - daily_baseline) / std_d) if (val is not None and daily_baseline is not None and std_d and std_d > 0) else None
+        days_out.append({
+            'date': dt.isoformat(),
+            'day': dt.day,
+            'weekday': dt.weekday(),
+            'iso_week': dt.isocalendar().week,
+            'value': round(float(val), 2) if val is not None else None,
+            'baseline_mean': round(float(daily_baseline), 2) if daily_baseline is not None else None,
+            'anomaly_pct': round(float(anom_pct), 2) if anom_pct is not None else None,
+            'anomaly_zscore': round(float(anom_z), 2) if anom_z is not None else None,
+        })
+
+    return {
+        'year': year,
+        'month': month,
+        'days_in_month': last_day,
+        'first_weekday': date(year, month, 1).weekday(),
+        'source': 'weekly_distributed',
+        'unit': monthly_res.get('unit'),
+        'resolution_source': 'iso_weekly_distributed' if used_weekly else 'monthly_distributed',
+        'month_total': round(float(month_total), 2) if month_total is not None else None,
+        'baseline_mean': round(float(baseline_month), 2) if baseline_month is not None else None,
+        'days': days_out,
+    }

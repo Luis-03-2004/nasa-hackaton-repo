@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { LanguageSelector, useI18n } from '../../i18n'
 import type { Country, MapMode, Query } from '../../types/exploration'
-import { InfoToggle } from './InfoToggle'
+import { InfoToggle, MetricInfo } from './InfoToggle'
 
 const DATE_PRESETS = [
   { id: '1m', labelPt: '1M (Dez 2025)', labelEn: '1M (Dec 2025)', start: '2025-12-01', end: '2025-12-31' },
@@ -104,6 +104,17 @@ export function ExplorerControls({
     </div>
     <div className="grid gap-4 lg:grid-cols-3 xl:grid-cols-4">
       <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-slate-400">
+            {t('País / Território (Escopo Espacial)', 'Country / Territory (Spatial Scope)')}
+          </span>
+          <MetricInfo term={t('Escopo Espacial (País ou Mundo)', 'Spatial Scope (Country or World)')}>
+            {t(
+              'Filtra todas as análises (Mapa, Calendário, Série Histórica e Previsão F₂) para as células terrestres de 1°×1° pertencentes ao país selecionado, ou analisa todos os 16.610 pontos terrestres do planeta ("Mundo"). Dica: Ctrl+Clique em um ponto no mapa seleciona o país dele automaticamente.',
+              'Filters all analyses (Map, Calendar, Historical Series, and F₂ Forecast) to the 1°×1° land cells inside the selected country, or analyzes all 16,610 global land points ("World"). Tip: Ctrl+Click any point on the map to select its country.',
+            )}
+          </MetricInfo>
+        </div>
         <label className="block text-xs text-slate-400">{t('Pesquisar país / território', 'Search country / territory')}
           <input aria-label={t('Pesquisar país', 'Search country')} type="search" className={`${field} mt-1`} value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('Nome ou alias da fonte', 'Name or source alias')} />
         </label>
@@ -125,6 +136,12 @@ export function ExplorerControls({
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs text-slate-400">{t('Período (Mapa, Gráficos e CSV)', 'Date range (Map, Charts & CSV)')}</p>
+          <MetricInfo term={t('Período de Análise (2000–2025)', 'Analysis Date Range (2000–2025)')}>
+            {t(
+              'Define o intervalo temporal das observações históricas da NASA FIRMS (de 01/01/2000 a 31/12/2025). Os botões rápidos (1M, 3M, 6M, Ano 2025, 5A, Tudo) ajustam automaticamente a janela temporal do Mapa, do Calendário, da Série Histórica e da exportação CSV.',
+              'Defines the historical observation window from NASA FIRMS (2000-01-01 to 2025-12-31). Quick presets (1M, 3M, 6M, 1Y, 5Y, All) update the Map, Calendar, Historical Series, and CSV export simultaneously.',
+            )}
+          </MetricInfo>
         </div>
         <div className="flex flex-wrap gap-1">
           {DATE_PRESETS.map((preset) => {
@@ -150,6 +167,15 @@ export function ExplorerControls({
             <input className={field} aria-label={t('Data final', 'End date')} type="date" min="2000-01-01" max="2025-12-31" value={query.end_date} onChange={(e) => { if (e.target.value) update({ end_date: e.target.value }) }} />
           </label>
         </div>
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-slate-400">{t('Resolução Temporal', 'Temporal Resolution')}</span>
+          <MetricInfo term={t('Agrupamento Temporal', 'Temporal Aggregation')}>
+            {t(
+              'Define como a Série Histórica consolida o tempo: • Mensal (YYYY-MM), • Anual (YYYY), • Semanal (YYYY-Www ISO) ou • Diário (YYYY-MM-DD direto da fonte original quando um país está selecionado).',
+              'Controls how the Historical Series aggregates time: • Monthly (YYYY-MM), • Yearly (YYYY), • Weekly (ISO YYYY-Www), or • Daily (YYYY-MM-DD from the original daily source when a country is selected).',
+            )}
+          </MetricInfo>
+        </div>
         <label className="block text-xs text-slate-400">{t('Agrupamento', 'Aggregation')}
           <select aria-label={t('Agrupamento', 'Aggregation')} className={`${field} mt-1`} value={query.resolution} onChange={(e) => update({ resolution: e.target.value as Query['resolution'] })}>
             <option value="monthly">{t('Mensal', 'Monthly')}</option>
@@ -158,10 +184,28 @@ export function ExplorerControls({
             <option value="daily">{t('Diário (fonte original)', 'Daily (original source)')}</option>
           </select>
         </label>
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] text-slate-400">{t('Filtro Sazonal de Meses', 'Seasonal Month Filter')}</span>
+          <MetricInfo term={t('Filtro Sazonal por Mês (Jan–Dez)', 'Seasonal Month Filter (Jan–Dec)')}>
+            {t(
+              'Permite isolar meses específicos em todos os anos (ex.: marcar apenas Ago, Set e Out para comparar exclusivamente a estação seca ao longo de 2000–2025). Quando nenhum mês está marcado, todos os 12 meses são incluídos.',
+              'Isolates specific calendar months across all selected years (e.g., selecting Aug, Sep, Oct to compare only the peak fire season across 2000–2025). When no month is toggled, all 12 months are included.',
+            )}
+          </MetricInfo>
+        </div>
         <div className="flex flex-wrap gap-1">{labels.map((label, i) => <button key={i} type="button" aria-pressed={query.months.includes(i + 1)} className={`rounded border px-1.5 py-1 text-[10px] ${query.months.includes(i + 1) ? 'border-purple-300 bg-purple-500/25 text-white' : 'border-white/10 text-slate-400'}`} onClick={() => update({ months: query.months.includes(i + 1) ? query.months.filter((m) => m !== i + 1) : [...query.months, i + 1].sort((a, b) => a - b) })}>{label}</button>)}</div>
         <p className="text-[10px] text-slate-400">{t('Nenhum mês marcado = todos os meses.', 'No month selected = all months.')}</p>
       </div>
       <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-slate-400">{t('Unidade Física / Métrica', 'Physical Unit / Metric')}</span>
+          <MetricInfo term={t('Métricas de Anomalia Térmica', 'Thermal Anomaly Metrics')}>
+            {t(
+              '• Registros de células por sensor (records): número de células de 1 km com anomalia térmica ativa por mês × semana ISO × sensor.\n• Detecções agrupadas (detections): total bruto de passagens sub-pixel de satélite (375 m no VIIRS e 1 km no MODIS) consolidadas.\n• Soma de FRP registrada (MW): soma da Potência Radiativa do Fogo em Megawatts (energia térmica liberada pela combustão).',
+              '• Cell records by sensor (records): count of active 1 km thermal anomaly cells per month × ISO week × sensor.\n• Merged detections (detections): total sub-pixel satellite passes (375 m VIIRS / 1 km MODIS) merged into 1 km cells.\n• Recorded FRP sum (MW): total Fire Radiative Power in Megawatts (radiant heat output).',
+            )}
+          </MetricInfo>
+        </div>
         <label className="block text-xs text-slate-400">{t('Métrica', 'Metric')}
           <select aria-label={t('Métrica', 'Metric')} className={`${field} mt-1`} value={query.metric} onChange={(e) => update({ metric: e.target.value as Query['metric'] })}>
             <option value="records">{t('Registros de células por sensor', 'Cell records by sensor')}</option>
@@ -169,10 +213,30 @@ export function ExplorerControls({
             <option value="frp">{t('Soma de FRP registrada', 'Recorded FRP sum')}</option>
           </select>
         </label>
-        <fieldset className="space-y-1"><legend className="mb-1 text-xs text-slate-400">{t('Sensores', 'Sensors')}</legend>{[['modis', 'MODIS'], ['viirs-snpp', 'VIIRS S-NPP'], ['viirs-jpss1', 'VIIRS NOAA-20']].map(([id, label]) => <label key={id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={query.sensors.includes(id)} onChange={() => update({ sensors: query.sensors.includes(id) ? query.sensors.filter((s) => s !== id) : [...query.sensors, id] })} />{label}</label>)}</fieldset>
+        <fieldset className="space-y-1">
+          <legend className="mb-1 flex items-center gap-1 text-xs text-slate-400">
+            <span>{t('Sensores', 'Sensors')}</span>
+            <MetricInfo term={t('Constelação de Sensores Orbitais (NASA/NOAA)', 'Orbital Sensor Constellation (NASA/NOAA)')}>
+              {t(
+                '• MODIS (Terra/Aqua, 2000–2025): resolução espacial nominal de 1 km, base histórica contínua de 26 anos.\n• VIIRS S-NPP (Suomi NPP, 2012–2025): resolução fina de 375 m, maior sensibilidade a pequenos focos e fogo noturno.\n• VIIRS NOAA-20 (JPSS-1, 2018–2025): segundo satélite VIIRS em órbita complementar (375 m).',
+                '• MODIS (Terra/Aqua, 2000–2025): 1 km nominal spatial resolution, continuous 26-year historical baseline.\n• VIIRS S-NPP (Suomi NPP, 2012–2025): 375 m high-resolution radiometer, detects smaller and nighttime fires.\n• VIIRS NOAA-20 (JPSS-1, 2018–2025): second VIIRS satellite in complementary orbit (375 m).',
+              )}
+            </MetricInfo>
+          </legend>
+          {[['modis', 'MODIS'], ['viirs-snpp', 'VIIRS S-NPP'], ['viirs-jpss1', 'VIIRS NOAA-20']].map(([id, label]) => <label key={id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={query.sensors.includes(id)} onChange={() => update({ sensors: query.sensors.includes(id) ? query.sensors.filter((s) => s !== id) : [...query.sensors, id] })} />{label}</label>)}
+        </fieldset>
         <InfoToggle label={t('Informações: unidades e sensores', 'Information: units and sensors')}>{t('As contagens preservam sensores e o merge legado por mês/semana; não são incêndios únicos nem área queimada. Somar FRP ao longo do tempo não mede energia ou potência simultânea. Sensor indisponível é diferente de zero. A harmonização legada continua identificada separadamente até a reconciliação de um índice aditivo.', 'Counts preserve sensors and the legacy month/week merge; they are not unique fires or burned area. Summing FRP over time does not measure energy or simultaneous power. An unavailable sensor differs from zero. Legacy harmonization remains separate until an additive index is reconciled.')}</InfoToggle>
       </div>
       <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-slate-400">{t('Busca Geográfica e Seleção', 'Geographic Search & Selection')}</span>
+          <MetricInfo align="right" term={t('Coordenadas (Lat/Lon) e Grade 1°×1°', 'Coordinates (Lat/Lon) & 1°×1° Grid')}>
+            {t(
+              'O planeta é indexado em células terrestres de 1°×1° (~111 km × 111 km no Equador). Informe Latitude (-90° a +90°) e Longitude (-180° a +180°) ou use "📍 Meu GPS" para centralizar a câmera e inspecionar a célula correspondente.',
+              'The globe is indexed into 1°×1° land cells (~111 km × 111 km at the Equator). Enter Latitude (-90° to +90°) and Longitude (-180° to +180°) or click "📍 My GPS" to focus the camera and inspect that cell.',
+            )}
+          </MetricInfo>
+        </div>
         <form className="grid grid-cols-2 gap-2" onSubmit={(e) => { e.preventDefault(); onCoordinate(Number(lat), Number(lon), false) }}>
           <label className="text-xs text-slate-400">{t('Latitude', 'Latitude')}<input aria-label="Latitude" className={field} type="number" min={-90} max={90} step="any" required value={lat} onChange={(e) => setLat(e.target.value)} /></label>
           <label className="text-xs text-slate-400">{t('Longitude', 'Longitude')}<input aria-label="Longitude" className={field} type="number" min={-180} max={180} step="any" required value={lon} onChange={(e) => setLon(e.target.value)} /></label>
@@ -182,7 +246,15 @@ export function ExplorerControls({
           </button>
         </form>
         {gpsError && <p role="alert" className="text-xs text-amber-200">{gpsError}</p>}
-        <p className="font-mono text-xs text-purple-200">{number(selectedCount)} {t('pontos selecionados', 'selected points')}</p>
+        <p className="flex items-center gap-1 font-mono text-xs text-purple-200">
+          <span>{number(selectedCount)} {t('pontos selecionados', 'selected points')}</span>
+          <MetricInfo align="right" term={t('Pontos Selecionados (Células de 1°)', 'Selected Points (1° Grid Cells)')}>
+            {t(
+              'Quantidade de células terrestres de 1°×1° selecionadas manualmente no mapa (por clique ou arraste de caixa). Quando > 0, todos os gráficos e a Previsão F₂ calculam resultados exclusivamente para essas células.',
+              'Number of 1°×1° land cells manually selected on the map (via click or bounding-box drag). When > 0, all charts and the F₂ Forecast compute results exclusively for those cells.',
+            )}
+          </MetricInfo>
+        </p>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={onClear} className="control-button">{t('Limpar seleção', 'Clear selection')}</button>
           <button type="button" onClick={onUndo} className="control-button">{t('Desfazer', 'Undo')}</button>
@@ -192,8 +264,20 @@ export function ExplorerControls({
     </div>
     <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3">
       {([['3d', t('Observações 3D', '3D observations')], ['2d', t('Observações 2D', '2D observations')], ['heat3d', t('Calor 3D', '3D heatmap')], ['heat2d', t('Calor 2D', '2D heatmap')]] as Array<[MapMode, string]>).map(([id, label]) => <button key={id} type="button" aria-pressed={mode === id} onClick={() => onMode(id)} className={`rounded-lg border px-3 py-2 text-xs ${mode === id ? 'border-purple-300 bg-purple-500/25' : 'border-white/10 text-slate-300'}`}>{label}</button>)}
+      <MetricInfo term={t('Modos de Visualização Espacial (3D / 2D / Calor)', 'Spatial View Modes (3D / 2D / Heatmap)')}>
+        {t(
+          '• Observações 3D / 2D: exibe cada célula de 1° como um ponto discreto colorido pelo percentil da métrica (ótimo para selecionar células e inspecionar valores exatos).\n• Calor 3D / 2D: renderiza densidade contínua ponderada pela intensidade térmica para destacar manchas regionais e corredores de queimadas.',
+          '• 3D / 2D Observations: renders each 1° cell as a discrete point colored by metric percentile (ideal for selecting cells and inspecting exact values).\n• 3D / 2D Heatmap: renders continuous intensity-weighted density to highlight regional hotspots and fire corridors.',
+        )}
+      </MetricInfo>
       <label className="flex items-center gap-2 text-xs">{t('Ano A', 'Year A')}<select aria-label={t('Ano A', 'Year A')} className="rounded border border-white/20 bg-[#070b12] px-2 py-2 font-mono" value={year} onChange={(e) => onYear(Number(e.target.value))}>{years.map((y) => <option key={y}>{y}</option>)}</select></label>
       <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={compare} onChange={(e) => onCompare(e.target.checked)} />{t('Comparar anos', 'Compare years')}</label>
+      <MetricInfo term={t('Comparação Lado a Lado (Ano A vs Ano B)', 'Side-by-Side Comparison (Year A vs Year B)')}>
+        {t(
+          'Divide o painel do mapa em dois globos/mapas sincronizados (Ano A e Ano B) com escala comum opcional, permitindo comparar visualmente a evolução espacial das queimadas entre dois anos distintos.',
+          'Splits the map viewport into two synchronized globes/maps (Year A and Year B) with an optional shared scale to visually compare spatial fire patterns across two different years.',
+        )}
+      </MetricInfo>
       {compare && <label className="flex items-center gap-2 text-xs">{t('Ano B', 'Year B')}<select aria-label={t('Ano B', 'Year B')} className="rounded border border-white/20 bg-[#070b12] px-2 py-2 font-mono" value={yearB} onChange={(e) => onYearB(Number(e.target.value))}>{years.map((y) => <option key={y}>{y}</option>)}</select></label>}
       <button
         type="button"
@@ -219,6 +303,12 @@ export function ExplorerControls({
           <span>{t('Exportar CSV', 'Export CSV')}</span>
         )}
       </button>
+      <MetricInfo align="right" term={t('Exportar CSV do Recorte', 'Export Selection CSV')}>
+        {t(
+          'Gera uma planilha CSV contendo a série temporal completa e o detalhamento por sensor (MODIS, VIIRS S-NPP e VIIRS NOAA-20) do país/células e período atualmente filtrados.',
+          'Generates a CSV spreadsheet with the full time series and per-sensor breakdown (MODIS, VIIRS S-NPP, and VIIRS NOAA-20) for the currently filtered country/cells and date range.',
+        )}
+      </MetricInfo>
     </div>
   </section>
 }
