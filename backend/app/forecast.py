@@ -10,7 +10,19 @@ import pyarrow.parquet as pq
 
 from app.dates import observation_week_start
 
-DATA_DIR = Path(os.getenv("FIRE_DATA_DIR", Path(__file__).resolve().parents[3] / "data/global_1km_2000_2025"))
+def _data_directory():
+    configured = os.getenv("FIRE_DATA_DIR")
+    if configured:
+        return Path(configured)
+    # O workspace tem repositórios aninhados; a imagem usa /app/app.
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / "data/global_1km_2000_2025"
+        if candidate.is_dir():
+            return candidate
+    return Path("/data/global_1km_2000_2025")
+
+
+DATA_DIR = _data_directory()
 FEATURE_NAMES = ("anom_t", "anom_tm1", "frp_intensity_anom", "thermal_contrast_anom", "night_ratio_anom", "subpixel_density_anom")
 PROVENANCE = "NASA FIRMS / EOSDIS; derivados da equipe 2000–2025. 0 = sem detecção registrada nos arquivos; não comprova ausência de fogo. Uma célula não é um incêndio único."
 SNAPSHOT_PROVENANCE = "Projeção experimental F2 pré-calculada, ancorada na última semana ativa de 2025 de cada ponto; não é previsão atual nem oficial NASA. O gerador inclui imputações físicas quando faltam semanas e não registra a máscara de imputação; os drivers do catálogo não devem ser tratados como medições verificadas."

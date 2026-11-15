@@ -1,3 +1,13 @@
 .env
+.env.*
+!.env.example
+!.env.*.example
+.aws/
+.venv/
+node_modules/
+dist/
+/data/
+*.pem
+*.key
 __pycache__/
 *.py[cod]

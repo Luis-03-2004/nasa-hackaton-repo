@@ -39,3 +39,17 @@ export function fetchArea(bounds: [number, number, number, number], month: strin
 export function fetchSensorSeries(region: string, year: number, signal?: AbortSignal) {
   return request<{ series: Array<{ month: number; week_start: string; n_modis: number | null; n_viirs_snpp: number | null; n_viirs_jpss1: number | null }>; provenance: string }>(`/observations/region-series?${new URLSearchParams({ region, year: String(year) })}`, signal)
 }
+
+export async function postApi<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(300000)]) : AbortSignal.timeout(300000),
+  })
+  if (!response.ok) {
+    let detail = ''
+    try { const data = await response.json(); detail = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail) } catch { /* Response status gives context. */ }
+    throw new Error(`${response.status}: ${detail || 'API request failed'}`)
+  }
+  return response.json() as Promise<T>
+}
+export function getApi<T>(path: string, signal?: AbortSignal) { return request<T>(path, signal) }

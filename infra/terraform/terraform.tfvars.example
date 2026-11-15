@@ -1,0 +1,12 @@
+aws_profile = "firecal-terraform"
+aws_region = "us-east-1"
+expected_account_id = "123456789012" # Substituir pelo ID da conta pessoal conferida em STS.
+artifact_bucket = "firecalglobal-123456789012-us-east-1"
+domain_name = "firecalglobal.duckdns.org"
+duckdns_auto_update = false
+instance_type = "t3.micro"
+enable_rds = false
+root_volume_gib = 10
+data_volume_gib = 30
+db_instance_class = "db.t4g.micro"
+db_storage_gib = 20

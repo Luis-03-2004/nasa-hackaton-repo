@@ -1,0 +1,16 @@
+#cloud-config
+write_files:
+  - path: /etc/firecal/config.json
+    permissions: '0600'
+    encoding: b64
+    content: ${config}
+  - path: /usr/local/lib/firecal/host_runtime.py
+    permissions: '0700'
+    encoding: b64
+    content: ${host_runtime}
+  - path: /usr/local/lib/firecal/host-bootstrap.sh
+    permissions: '0700'
+    encoding: b64
+    content: ${host_bootstrap}
+runcmd:
+  - [bash, /usr/local/lib/firecal/host-bootstrap.sh]

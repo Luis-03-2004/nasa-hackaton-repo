@@ -1,0 +1,13 @@
+.git
+.env
+.env.*
+**/.env
+**/.env.*
+**/node_modules
+**/__pycache__
+**/dist
+**/.venv
+infra
+data
+*.pem
+*.key

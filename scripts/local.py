@@ -32,6 +32,7 @@ def wait_http(url, child, timeout=40):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--prepare', action='store_true', help='Prepara índices históricos e cache F2 a partir dos dados locais')
     mode.add_argument('--detach', action='store_true', help='Inicia em segundo plano com logs em data/')
     mode.add_argument('--stop', action='store_true', help='Encerra somente o supervisor salvo por --detach')
     mode.add_argument('--status', action='store_true', help='Consulta os serviços iniciados por --detach')
@@ -63,6 +64,12 @@ def main():
             print(f"Supervisor ativo (PID {pid}) · interface http://localhost:5173 · API http://localhost:8000/docs")
         else:
             print("Nenhum supervisor local salvo está ativo.")
+        return
+    if args.prepare:
+        env = {**os.environ, 'FIRE_DATA_DIR': str(data_dir)}
+        subprocess.run([sys.executable, '-c', 'from app.exploration import build_cube; build_cube()'], cwd=WEB_DIR / 'backend', env=env, check=True)
+        subprocess.run([sys.executable, '-m', 'app.forecast_selection', '--build'], cwd=WEB_DIR / 'backend', env=env, check=True)
+        print('Índices históricos e cache F2 prontos. Inicie com ./iniciar_local.sh --detach')
         return
     if args.detach:
         if owned_pid():
@@ -103,7 +110,7 @@ def main():
         wait_http("http://127.0.0.1:5173", web)
         with urlopen("http://127.0.0.1:8000/health") as response:
             health = json.load(response)
-        print(f"\nSistema local disponível: http://localhost:5173\nAPI e documentação: http://localhost:8000/docs\n{health['world_points']:,} pontos · armazenamento {health['storage']} · Ctrl+C encerra ambos\n", flush=True)
+        print(f"\nSistema local disponível: http://localhost:5173\nAPI e documentação: http://localhost:8000/docs\n{health['world_points']:,} pontos no catálogo F2 legado · armazenamento {health['storage']} · Ctrl+C encerra ambos\n", flush=True)
         while all(child.poll() is None for child in children):
             time.sleep(1)
         raise RuntimeError("Um dos serviços encerrou; consulte a saída acima.")

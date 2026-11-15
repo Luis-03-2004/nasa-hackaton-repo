@@ -1,0 +1,55 @@
+name: firecal
+services:
+  api:
+    image: firecal-api:${RELEASE_ID:?Informe RELEASE_ID}
+    build:
+      context: ../..
+      dockerfile: deploy/aws/Dockerfile.api
+    restart: unless-stopped
+    env_file: ${BACKEND_ENV_FILE:-/etc/firecal/backend.env}
+    environment:
+      FIRE_DATA_DIR: /data/global_1km_2000_2025
+      TMPDIR: /data/global_1km_2000_2025/web_v2/tmp
+      FIRE_MAX_PARALLEL_QUERIES: '1'
+      FIRE_ARROW_THREADS: '2'
+      FIRE_RELEASE_ARROW_MEMORY: '1'
+      FIRE_REQUIRE_PREPARED_CACHE: '1'
+    volumes:
+      - /opt/firecal/data:/data:ro
+      - /opt/firecal/data/global_1km_2000_2025/web_v2:/data/global_1km_2000_2025/web_v2
+      - /opt/firecal/rds-ca.pem:/run/firecal/rds-ca.pem:ro
+    read_only: true
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 700m
+    memswap_limit: 1700m
+    healthcheck:
+      test: [CMD, python, -c, "import json, urllib.request; s=json.load(urllib.request.urlopen('http://127.0.0.1:8000/explore/status', timeout=15)); assert s.get('ready')"]
+      interval: 30s
+      timeout: 20s
+      start_period: 90s
+      retries: 3
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: '3'}
+  web:
+    image: firecal-web:${RELEASE_ID:?Informe RELEASE_ID}
+    build:
+      context: ../..
+      dockerfile: deploy/aws/Dockerfile.web
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?Informe DOMAIN}
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - /opt/firecal/caddy/data:/data
+      - /opt/firecal/caddy/config:/config
+    depends_on:
+      api: {condition: service_healthy}
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: '3'}

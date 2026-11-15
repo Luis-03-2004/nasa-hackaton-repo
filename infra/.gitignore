@@ -1,0 +1,11 @@
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+*.tfplan
+plan.json
+backend.hcl
+crash.log
+.tools/
+.release/

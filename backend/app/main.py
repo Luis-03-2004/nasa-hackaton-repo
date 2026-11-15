@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from app import forecast, local_observations
 from app.database import STORAGE
+from app.workload import WorkloadMiddleware, configure_arrow_threads
 from datetime import date
 from collections.abc import Iterator
 from typing import Annotated
@@ -29,6 +30,7 @@ from app.schemas import (
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    configure_arrow_threads()
     if STORAGE == "sql":
         Base.metadata.create_all(bind=engine)
     elif STORAGE != "parquet":
@@ -220,6 +222,7 @@ def get_area_features(
 
 app.add_middleware(CORSMiddleware, allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(","), allow_credentials=False, allow_methods=["GET", "POST"], allow_headers=["*"])
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+app.add_middleware(WorkloadMiddleware)
 
 
 @app.get("/health")
@@ -255,3 +258,10 @@ def get_region_series(region: str = "brazil", year: Annotated[int, Query(ge=2000
     if region not in ("global", "brazil"):
         raise HTTPException(422, "A comparação por sensor está disponível para global e brazil")
     return local_observations.region_series(region, year)
+
+# Histórico mundial versionado; rotas legadas permanecem disponíveis.
+from app.exploration_routes import router as exploration_router
+app.include_router(exploration_router)
+
+from app.forecast_selection_routes import router as forecast_selection_router
+app.include_router(forecast_selection_router)

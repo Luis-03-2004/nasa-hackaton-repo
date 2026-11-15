@@ -1,5 +1,9 @@
 # API local do FireCal
 
+Para publicação com EC2, PostgreSQL/RDS privado, S3 e HTTPS/DuckDNS, siga
+[o roteiro AWS e Terraform](../infra/README.md). O contrato da migração do cubo
+analítico está em [docs/RDS.md](docs/RDS.md).
+
 Python **3.12.2**, FastAPI e PyArrow. O modo padrão consulta os artefatos
 locais em somente leitura, sem importar 295 milhões de linhas no PostgreSQL.
 Não há download nem modificação das fontes durante a inicialização.
@@ -110,3 +114,19 @@ PYTHONPATH=nasa-hackaton-repo/backend .venv/bin/python -m unittest discover -s n
 Os testes distinguem fixtures sintéticas dos artefatos reais: validam viradas
 ISO, identidade da linha fonte, filtro espacial, agregação, paridade matemática
 com o script de treinamento, contrato dos 16.525 pontos e CORS.
+
+## Exploração global V2 e referência comum
+
+A interface atual usa `GET /explore/countries`, `GET /explore/status`, `POST /explore/query`, `POST /explore/map` e `POST /forecast/selection`. Os índices são preparados uma vez com `./iniciar_local.sh --prepare`, na raiz Web. Consultas observacionais não exigem RDS.
+
+Exemplo de corpo para query/map:
+
+```json
+{"country":"Canada","point_ids":[],"start_date":"2025-01-01","end_date":"2025-12-31","months":[],"sensors":["modis"],"metric":"records","resolution":"monthly","locale":"pt-BR"}
+```
+
+As métricas são `records`, `detections`, `frp` e `harmonized` (M2-V2 linear experimental, sem herdar validação legada). As resoluções são mensal, anual, semanal e diária. Para dia exato, selecionar país e um único ano: os dados são lidos dos originais CSV/ZIP com cache separado. Os endpoints devolvem unidade, filtros, datas efetivas, disponibilidade e quantidades selecionadas/processadas/sem registros. IDs sobrepostos são deduplicados antes do cálculo.
+
+A nova projeção aceita `country`, `point_ids`, `reference_date` e `locale`. Recalcula todas as células na mesma semana e mostra explicitamente o apoio climatológico F₀ quando não há telemetria útil, sem substituir entradas por constantes térmicas. Usa referências de 2024 a 22/12/2025, não dados atuais de 2026.
+
+Veja [LOCAL.md](../LOCAL.md) e [F2_REFERENCIA_COMUM.md](../docs/F2_REFERENCIA_COMUM.md) para contratos, disponibilidade, avaliação e limites. As rotas legadas descritas acima continuam disponíveis.

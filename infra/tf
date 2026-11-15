@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+infra_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if [ -x "$infra_dir/.tools/terraform" ]; then
+    exec "$infra_dir/.tools/terraform" "$@"
+fi
+exec terraform "$@"

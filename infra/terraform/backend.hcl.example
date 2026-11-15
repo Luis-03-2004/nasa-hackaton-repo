@@ -1,0 +1,6 @@
+bucket = "firecalglobal-123456789012-us-east-1"
+key = "state/prod/terraform.tfstate"
+region = "us-east-1"
+profile = "firecal-terraform"
+encrypt = true
+use_lockfile = true

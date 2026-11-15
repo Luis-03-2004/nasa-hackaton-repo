@@ -1,5 +1,6 @@
 """Testes de contrato, dados locais e virada ISO (fixtures são sintéticas)."""
 import importlib.util
+import os
 from pathlib import Path
 import tempfile
 import time
@@ -19,6 +20,13 @@ from datetime import date
 
 
 class LocalIntegrationTest(unittest.TestCase):
+    def test_data_directory_supports_shallow_container_layout(self):
+        with patch.object(forecast, "__file__", "/app/app/forecast.py"):
+            with patch.dict(os.environ, {"FIRE_DATA_DIR": "/mounted/scientific-data"}):
+                self.assertEqual(forecast._data_directory(), Path("/mounted/scientific-data"))
+            with patch.dict(os.environ, {}, clear=True), patch.object(Path, "is_dir", return_value=False):
+                self.assertEqual(forecast._data_directory(), Path("/data/global_1km_2000_2025"))
+
     def test_calendar_year_iso_week_boundaries(self):
         self.assertEqual(observation_week_start(2021, 1, 53), date(2020, 12, 28))
         self.assertEqual(observation_week_start(2020, 12, 53), date(2020, 12, 28))
