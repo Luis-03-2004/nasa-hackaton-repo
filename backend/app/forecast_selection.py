@@ -96,9 +96,25 @@ def cache_ready():
         return False
 
 
+def _ensure_inventory(db):
+    exists = db.execute("SELECT 1 FROM sqlite_master WHERE name='point_inventory'").fetchone()
+    if not exists:
+        db.execute('CREATE TABLE point_inventory AS SELECT point_id,lat,lon,country FROM weekly GROUP BY point_id,country')
+        db.execute('CREATE INDEX inventory_scope ON point_inventory(country,point_id)')
+        db.execute('CREATE INDEX inventory_point ON point_inventory(point_id)')
+        db.commit()
+    elif not db.execute("SELECT 1 FROM sqlite_master WHERE name='inventory_point'").fetchone():
+        db.execute('CREATE INDEX inventory_point ON point_inventory(point_id)')
+        db.commit()
+
+
 def build_cache():
     """Materializa os 36 arquivos de 2012–2025; escrita atômica e lock local."""
-    if cache_ready(): return cache_path()
+    if cache_ready():
+        if os.getenv('FIRE_REQUIRE_PREPARED_CACHE') != '1':
+            with sqlite3.connect(cache_path(), timeout=60) as db:
+                _ensure_inventory(db)
+        return cache_path()
     if os.getenv('FIRE_REQUIRE_PREPARED_CACHE') == '1':
         raise HTTPException(503, 'Histórico temporariamente indisponível. Tente novamente mais tarde.', headers={'Retry-After': '5'})
     import fcntl
@@ -148,6 +164,7 @@ def build_cache():
             db.execute('CREATE INDEX weekly_point_country ON weekly(point_id,country)')
             db.execute('CREATE INDEX weekly_point_time ON weekly(point_id,iso_year,iso_week,sensor)')
             db.execute('CREATE INDEX weekly_country_point ON weekly(country,point_id)')
+            _ensure_inventory(db)
             db.executemany('INSERT INTO metadata VALUES (?,?)',[('signature',raw_source_signature()),('version',CACHE_VERSION),('build_seconds',str(round(time.monotonic()-started,2)))])
             db.commit()
         staging.replace(cache_path())
@@ -190,15 +207,13 @@ def load_selection(country,ids,reference=None):
         return db,db.execute(query,parameters),available
     # Keep every eligible cell, even cells with zero records in this seasonal
     # window. Only the weeks actually needed by t, t-1 and h1..h4 are loaded.
-    import fcntl
-    CACHE_DIR.mkdir(parents=True,exist_ok=True)
-    with (CACHE_DIR/'inventory.lock').open('a') as lock:
-        fcntl.flock(lock,fcntl.LOCK_EX)
-        exists=db.execute("SELECT 1 FROM sqlite_master WHERE name='point_inventory'").fetchone()
-        if not exists:
-            db.execute('CREATE TABLE point_inventory AS SELECT point_id,lat,lon,country FROM weekly GROUP BY point_id,country')
-            db.execute('CREATE INDEX inventory_scope ON point_inventory(country,point_id)')
-            db.commit()
+    exists=db.execute("SELECT 1 FROM sqlite_master WHERE name='point_inventory'").fetchone()
+    if not exists:
+        import fcntl
+        CACHE_DIR.mkdir(parents=True,exist_ok=True)
+        with (CACHE_DIR/'inventory.lock').open('a') as lock:
+            fcntl.flock(lock,fcntl.LOCK_EX)
+            _ensure_inventory(db)
     needed=set()
     for offset in (-1,0,1,2,3,4):
         week=(reference+timedelta(weeks=offset)).isocalendar().week
@@ -312,8 +327,6 @@ def _cached_forecast(country,ids,reference_text,locale,signature):
                 result['reason']=localized(locale,'Histórico insuficiente na seleção.','Insufficient history in the selection.')
             return result
         except (OSError,ValueError):pass
-    model_metadata.cache_clear()
-    artifacts.cache_clear()
     reference=date.fromisoformat(reference_text)
     db,cursor,available=load_selection(country,ids,reference)
     totals=[{'horizon':h,'target_date':(reference+timedelta(days=7*h)).isoformat(),'value':0.,'baseline':0.} for h in range(1,5)]

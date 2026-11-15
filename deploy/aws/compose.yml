@@ -10,7 +10,7 @@ services:
     environment:
       FIRE_DATA_DIR: /data/global_1km_2000_2025
       TMPDIR: /data/global_1km_2000_2025/web_v2/tmp
-      FIRE_MAX_PARALLEL_QUERIES: '1'
+      FIRE_MAX_PARALLEL_QUERIES: '16'
       FIRE_ARROW_THREADS: '2'
       FIRE_RELEASE_ARROW_MEMORY: '1'
       FIRE_REQUIRE_PREPARED_CACHE: '1'
