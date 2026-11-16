@@ -98,3 +98,14 @@ privadas do novo assistente durante a publicação.
 Para validar o endereço publicado, substitua `FIRECAL_URL` por
 `https://firecalglobal.duckdns.org`. Os detalhes de operação e retorno à versão
 anterior continuam em [OPERACAO.md](../../infra/OPERACAO.md).
+
+A release **`20261116000004-53d8bff9bceb`** foi publicada com sucesso por SSM.
+As duas suítes Playwright também passaram no HTTPS público, sem erros
+JavaScript ou HTTP. O teste confirmou novamente 312 meses e 295.748.529
+registros; na seleção Shift pública, 101 células selecionadas foram
+processadas, com total de 3.038 registros no recorte visível do teste.
+A captura final da abertura confirmou F₂ disponível para 16.527 células,
+nenhum emoji no texto da interface e nenhum erro JavaScript. Na amostra de
+saúde durante os testes, ambos os containers tinham zero reinícios e nenhum
+OOM; a API usava aproximadamente 135 MiB do limite de 700 MiB. Essa medição
+pontual não substitui um teste de carga.
