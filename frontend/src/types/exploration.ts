@@ -80,7 +80,10 @@ export interface CalendarMonthData {
   month: number
   days_in_month: number
   first_weekday: number
-  source: 'exact_daily' | 'weekly_distributed'
+  source: 'exact_daily' | 'weekly_distributed' | 'monthly_distributed'
+  resolution_source?: 'exact_daily' | 'iso_weekly_distributed' | 'monthly_distributed'
+  is_estimated?: boolean
+  month_total?: number | null
   unit: string
   days: CalendarDayCell[]
 }

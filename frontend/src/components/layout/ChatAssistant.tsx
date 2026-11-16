@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { MapPin, X } from 'lucide-react'
 import { useI18n } from '../../i18n'
 import { postApi } from '../../services/fireApi'
 import type { Query } from '../../types/exploration'
@@ -120,7 +121,7 @@ export function ChatAssistant({
         ...nextMessages,
         {
           role: 'assistant',
-          content: `⚠️ ${msg}`,
+          content: msg,
         },
       ])
     } finally {
@@ -199,7 +200,7 @@ export function ChatAssistant({
               aria-label={t('Fechar assistente', 'Close assistant')}
               className="rounded-lg border border-white/15 px-2 py-1 text-xs text-slate-300 hover:bg-white/10"
             >
-              ✕
+              <X size={14} aria-hidden="true" />
             </button>
           </header>
 
@@ -211,7 +212,7 @@ export function ChatAssistant({
               disabled={gpsLoading || loading}
               className="flex items-center gap-1.5 rounded-lg border border-orange-400/40 bg-orange-500/10 px-2.5 py-1 font-medium text-orange-200 hover:bg-orange-500/20 disabled:opacity-50"
             >
-              <span>📍</span>
+              <MapPin size={14} aria-hidden="true" />
               <span>
                 {gpsLoading
                   ? t('Obtendo GPS…', 'Getting GPS…')

@@ -1,4 +1,5 @@
 import { Html, OrbitControls, useTexture } from '@react-three/drei'
+import { MapPin } from 'lucide-react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import { Color, DoubleSide, LinearFilter, Quaternion, Raycaster, Sphere, SRGBColorSpace, Vector2, Vector3, type Group } from 'three'
@@ -96,7 +97,7 @@ function GpsBeacon({ gpsPoint }: { gpsPoint: GlobePick | null }) {
       </mesh>
       <Html center occlude zIndexRange={[25, 0]} style={{ pointerEvents: 'none' }}>
         <div className="-translate-y-5 flex items-center gap-1 whitespace-nowrap rounded-full border border-cyan-300/80 bg-[#071a3d]/95 px-2 py-0.5 font-mono text-[10px] font-semibold text-cyan-200 shadow-lg">
-          <span>📍 GPS</span>
+          <MapPin size={12} aria-hidden="true" /><span>GPS</span>
           <span>({gpsPoint.lat.toFixed(2)}°, {gpsPoint.lon.toFixed(2)}°)</span>
         </div>
       </Html>

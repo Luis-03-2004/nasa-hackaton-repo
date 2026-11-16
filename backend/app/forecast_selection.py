@@ -9,6 +9,7 @@ import argparse
 from collections import defaultdict
 from datetime import date, timedelta
 from functools import lru_cache
+import fcntl
 import hashlib
 from itertools import groupby
 import json
@@ -18,6 +19,7 @@ from pathlib import Path
 import re
 import sqlite3
 import struct
+import threading
 import time
 
 import pyarrow as pa
@@ -31,6 +33,7 @@ CACHE_DIR = DATA_DIR / 'web_v2/f2'
 CACHE_VERSION = 'f2_common_week_cells_v1'
 SENSORS = ('modis', 'viirs-snpp', 'viirs-jpss1')
 POINT_PATTERN = re.compile(r'^pt_([+-]\d{2})_([+-]\d{3})$')
+_FAST_TABLES_LOCK = threading.Lock()
 
 
 def point_id(lat, lon):
@@ -112,20 +115,42 @@ def _ensure_inventory(db):
         db.commit()
 
 
-def _ensure_fast_tables(db):
-    """Pré-calcula climatologia semanal (52 semanas em float64) e observações 2024–2025 por célula."""
+def _fast_tables_ready(db):
     has_meta = db.execute("SELECT 1 FROM sqlite_master WHERE name='metadata'").fetchone()
     if not has_meta:
         return False
-    sig = raw_source_signature()
-    has_fast = bool(
+    return bool(
         db.execute("SELECT 1 FROM sqlite_master WHERE name='fast_clim_blob'").fetchone()
         and db.execute("SELECT 1 FROM sqlite_master WHERE name='fast_obs'").fetchone()
         and db.execute("SELECT 1 FROM fast_clim_blob LIMIT 1").fetchone()
     )
-    if has_fast:
-        return True
 
+
+def _cache_unavailable():
+    return HTTPException(503, 'Histórico temporariamente indisponível. Tente novamente mais tarde.', headers={'Retry-After': '5'})
+
+
+def _ensure_fast_tables(db):
+    """Reutiliza tabelas prontas; serializa a preparação entre threads e processos."""
+    if _fast_tables_ready(db):
+        return True
+    if os.getenv('FIRE_REQUIRE_PREPARED_CACHE') == '1':
+        raise _cache_unavailable()
+    with _FAST_TABLES_LOCK:
+        filename = next(row[2] for row in db.execute('PRAGMA database_list') if row[1] == 'main')
+        lock_path = Path(filename or cache_path()).with_suffix('.fast.lock')
+        with lock_path.open('a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            if _fast_tables_ready(db):
+                return True
+            if not db.execute("SELECT 1 FROM sqlite_master WHERE name='metadata'").fetchone():
+                return False
+            return _build_fast_tables(db)
+
+
+def _build_fast_tables(db):
+    """Pré-calcula climatologia semanal (52 semanas em float64) e observações 2024–2025 por célula."""
+    sig = raw_source_signature()
     t0 = time.monotonic()
     available = {(r[0], r[1], r[2]) for r in db.execute('SELECT * FROM source_weeks')}
     avail_years_by_w = {
@@ -246,14 +271,16 @@ def _ensure_fast_tables(db):
 def build_cache():
     """Materializa os 36 arquivos de 2012–2025; escrita atômica e lock local."""
     if cache_ready():
-        if os.getenv('FIRE_REQUIRE_PREPARED_CACHE') != '1':
-            with sqlite3.connect(cache_path(), timeout=60) as db:
+        with sqlite3.connect(cache_path(), timeout=60) as db:
+            if os.getenv('FIRE_REQUIRE_PREPARED_CACHE') == '1':
+                if not db.execute("SELECT 1 FROM sqlite_master WHERE name='point_inventory'").fetchone():
+                    raise _cache_unavailable()
+            else:
                 _ensure_inventory(db)
-                _ensure_fast_tables(db)
+            _ensure_fast_tables(db)
         return cache_path()
     if os.getenv('FIRE_REQUIRE_PREPARED_CACHE') == '1':
-        raise HTTPException(503, 'Histórico temporariamente indisponível. Tente novamente mais tarde.', headers={'Retry-After': '5'})
-    import fcntl
+        raise _cache_unavailable()
     CACHE_DIR.mkdir(parents=True,exist_ok=True)
     with (CACHE_DIR/'build.lock').open('a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX)

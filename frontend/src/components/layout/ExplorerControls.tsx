@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Globe, LocateFixed } from 'lucide-react'
 import { LanguageSelector, useI18n } from '../../i18n'
 import type { Country, MapMode, Query } from '../../types/exploration'
 import { InfoToggle, MetricInfo } from './InfoToggle'
@@ -125,8 +126,8 @@ export function ExplorerControls({
             {query.country && !choices.some((c) => c.id === query.country) && <option value={query.country}>{countryLabel(countries.find((c) => c.id === query.country) ?? { id: query.country, name: query.country })}</option>}
           </select>
           {query.country && (
-            <button type="button" onClick={() => update({ country: null, point_ids: [] })} className="control-button shrink-0 border-cyan-400/40 bg-cyan-500/15 text-cyan-200 hover:bg-cyan-500/25" title={t('Mostrar todos os países do mundo', 'Show all countries in the world')}>
-              {t('🌎 Mundo', '🌎 World')}
+            <button type="button" onClick={() => update({ country: null, point_ids: [] })} className="control-button inline-flex shrink-0 items-center gap-1.5 border-cyan-400/40 bg-cyan-500/15 text-cyan-200 hover:bg-cyan-500/25" title={t('Mostrar todos os países do mundo', 'Show all countries in the world')}>
+              <Globe size={14} aria-hidden="true" />{t('Mundo', 'World')}
             </button>
           )}
         </div>
@@ -232,8 +233,8 @@ export function ExplorerControls({
           <span className="text-xs text-slate-400">{t('Busca Geográfica e Seleção', 'Geographic Search & Selection')}</span>
           <MetricInfo align="right" term={t('Coordenadas (Lat/Lon) e Grade 1°×1°', 'Coordinates (Lat/Lon) & 1°×1° Grid')}>
             {t(
-              'O planeta é indexado em células terrestres de 1°×1° (~111 km × 111 km no Equador). Informe Latitude (-90° a +90°) e Longitude (-180° a +180°) ou use "📍 Meu GPS" para centralizar a câmera e inspecionar a célula correspondente.',
-              'The globe is indexed into 1°×1° land cells (~111 km × 111 km at the Equator). Enter Latitude (-90° to +90°) and Longitude (-180° to +180°) or click "📍 My GPS" to focus the camera and inspect that cell.',
+              'O planeta é indexado em células terrestres de 1°×1° (~111 km × 111 km no Equador). Informe Latitude (-90° a +90°) e Longitude (-180° a +180°) ou use "Meu GPS" para centralizar a câmera e inspecionar a célula correspondente.',
+              'The globe is indexed into 1°×1° land cells (~111 km × 111 km at the Equator). Enter Latitude (-90° to +90°) and Longitude (-180° to +180°) or click "My GPS" to focus the camera and inspect that cell.',
             )}
           </MetricInfo>
         </div>
@@ -241,8 +242,8 @@ export function ExplorerControls({
           <label className="text-xs text-slate-400">{t('Latitude', 'Latitude')}<input aria-label="Latitude" className={field} type="number" min={-90} max={90} step="any" required value={lat} onChange={(e) => setLat(e.target.value)} /></label>
           <label className="text-xs text-slate-400">{t('Longitude', 'Longitude')}<input aria-label="Longitude" className={field} type="number" min={-180} max={180} step="any" required value={lon} onChange={(e) => setLon(e.target.value)} /></label>
           <button type="submit" className="control-button">{t('Selecionar célula', 'Select cell')}</button>
-          <button type="button" className={`control-button ${gpsActive ? 'border-cyan-400/60 bg-cyan-500/20 text-cyan-200' : ''}`} onClick={gps} disabled={gpsLoading}>
-            {gpsLoading ? t('Localizando…', 'Locating…') : `📍 ${t('Meu GPS', 'My GPS')}`}
+          <button type="button" className={`control-button inline-flex items-center justify-center gap-1.5 ${gpsActive ? 'border-cyan-400/60 bg-cyan-500/20 text-cyan-200' : ''}`} onClick={gps} disabled={gpsLoading}>
+            <LocateFixed size={14} aria-hidden="true" />{gpsLoading ? t('Localizando…', 'Locating…') : t('Meu GPS', 'My GPS')}
           </button>
         </form>
         {gpsError && <p role="alert" className="text-xs text-amber-200">{gpsError}</p>}

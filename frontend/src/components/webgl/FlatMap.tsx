@@ -148,7 +148,7 @@ export function FlatMap({ hotspots, countries = [], selectedId = null, selectedI
         ctx.stroke()
 
         ctx.font = '600 10px "IBM Plex Mono", monospace'
-        const label = '📍 GPS'
+        const label = 'GPS'
         const tw = ctx.measureText(label).width
         ctx.fillStyle = 'rgba(7, 26, 61, 0.92)'
         ctx.fillRect(gp.x + 8, gp.y - 10, tw + 10, 18)

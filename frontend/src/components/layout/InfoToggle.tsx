@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { X } from 'lucide-react'
 import { useI18n } from '../../i18n'
 
 export function InfoToggle({ children, label }: { children: ReactNode; label?: string }) {
@@ -100,6 +101,7 @@ export function MetricInfo({
             {pinned && (
               <span
                 role="button"
+                aria-label={t('Fechar informação', 'Close information')}
                 tabIndex={0}
                 onClick={() => {
                   setPinned(false)
@@ -113,7 +115,7 @@ export function MetricInfo({
                 }}
                 className="cursor-pointer rounded px-1 text-[10px] text-slate-400 hover:bg-slate-800 hover:text-white"
               >
-                ✕
+                <X size={12} aria-hidden="true" />
               </span>
             )}
           </span>

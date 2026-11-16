@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { CalendarDays, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, Flame, History, Info, Link2, Map as MapIcon, MapPin, TriangleAlert } from 'lucide-react'
 import {
   CartesianGrid,
   Legend,
@@ -161,11 +162,13 @@ export function CalendarChart({
   selectedMonth,
   onMonth,
   onSelectDayRange,
+  onSelectYear,
 }: {
   data: Analysis
   selectedMonth: string
   onMonth: (month: string) => void
   onSelectDayRange?: (dateStr: string) => void
+  onSelectYear?: (year: number) => void
 }) {
   const { t, number, locale } = useI18n()
   const [mode, setMode] = useState<'value' | 'anomaly_pct' | 'anomaly_zscore'>('value')
@@ -188,6 +191,7 @@ export function CalendarChart({
   const [activeMonth, setActiveMonth] = useState<number>(parsedSelectedMonthNum)
   const [dayData, setDayData] = useState<CalendarMonthData | null>(null)
   const [dayLoading, setDayLoading] = useState(false)
+  const [dayError, setDayError] = useState('')
 
   // Mantém activeYear e activeMonth sincronizados com selectedMonth
   useEffect(() => {
@@ -223,6 +227,8 @@ export function CalendarChart({
     if (viewLevel !== 'days') return
     const controller = new AbortController()
     setDayLoading(true)
+    setDayData(null)
+    setDayError('')
     postApi<CalendarMonthData>(
       '/explore/calendar-month',
       {
@@ -232,12 +238,13 @@ export function CalendarChart({
         metric: data.filters.metric,
         year: activeYear,
         month: activeMonth,
+        locale: data.filters.locale,
       },
       controller.signal,
     )
-      .then((res) => setDayData(res))
-      .catch(() => {})
-      .finally(() => setDayLoading(false))
+      .then((res) => { if (!controller.signal.aborted) setDayData(res) })
+      .catch((error: unknown) => { if (!controller.signal.aborted) setDayError(error instanceof Error ? error.message : t('Falha ao carregar o calendário.', 'Failed to load the calendar.')) })
+      .finally(() => { if (!controller.signal.aborted) setDayLoading(false) })
     return () => controller.abort()
   }, [
     viewLevel,
@@ -247,6 +254,8 @@ export function CalendarChart({
     data.filters.point_ids,
     data.filters.sensors,
     data.filters.metric,
+    data.filters.locale,
+    t,
   ])
 
   const byKey = useMemo(
@@ -287,17 +296,20 @@ export function CalendarChart({
     return value > neutral ? '#fb923c' : '#64748b'
   }
 
+  const selectCalendarYear = (year: number) => {
+    if (year < 2000 || year > 2025) return
+    setActiveYear(year)
+    const first = Number(data.filters.start_date.slice(0, 4))
+    const last = Number(data.filters.end_date.slice(0, 4))
+    if (year < first || year > last || !data.calendar.length) onSelectYear?.(year)
+  }
+
   const stepMonth = (delta: number) => {
-    let y = activeYear
-    let m = activeMonth + delta
-    if (m < 1) {
-      m = 12
-      y = Math.max(2000, y - 1)
-    } else if (m > 12) {
-      m = 1
-      y = Math.min(2025, y + 1)
-    }
-    setActiveYear(y)
+    const next = new Date(Date.UTC(activeYear, activeMonth - 1 + delta, 1))
+    const y = next.getUTCFullYear()
+    if (y < 2000 || y > 2025) return
+    const m = next.getUTCMonth() + 1
+    selectCalendarYear(y)
     setActiveMonth(m)
     onMonth(`${y}-${String(m).padStart(2, '0')}`)
   }
@@ -549,7 +561,7 @@ export function CalendarChart({
                   onClick={() => setViewLevel('years')}
                   className="control-button text-[11px]"
                 >
-                  ← {t('Todos os anos', 'All years')}
+                  <ChevronLeft size={13} className="mr-1 inline-block" aria-hidden="true" />{t('Todos os anos', 'All years')}
                 </button>
                 <span className="font-mono text-xs font-semibold text-orange-200">
                   {t('Ano selecionado:', 'Selected year:')} {activeYear}
@@ -559,15 +571,16 @@ export function CalendarChart({
                 <button
                   type="button"
                   disabled={activeYear <= 2000}
-                  onClick={() => setActiveYear((y) => Math.max(2000, y - 1))}
+                  onClick={() => selectCalendarYear(activeYear - 1)}
+                  aria-label={t('Ano anterior do calendário', 'Previous calendar year')}
                   className="control-button px-2 py-1 font-mono text-xs disabled:opacity-40"
                 >
-                  ◀ {activeYear - 1}
+                  <ChevronLeft size={13} className="inline-block" aria-hidden="true" />{Math.max(2000, activeYear - 1)}
                 </button>
                 <select
                   aria-label={t('Ano do calendário', 'Calendar year')}
                   value={activeYear}
-                  onChange={(e) => setActiveYear(Number(e.target.value))}
+                  onChange={(e) => selectCalendarYear(Number(e.target.value))}
                   className="rounded border border-white/20 bg-[#0f1623] px-2 py-1 font-mono text-xs text-slate-100"
                 >
                   {Array.from({ length: 26 }, (_, i) => 2000 + i).map((y) => (
@@ -579,10 +592,11 @@ export function CalendarChart({
                 <button
                   type="button"
                   disabled={activeYear >= 2025}
-                  onClick={() => setActiveYear((y) => Math.min(2025, y + 1))}
+                  onClick={() => selectCalendarYear(activeYear + 1)}
+                  aria-label={t('Próximo ano do calendário', 'Next calendar year')}
                   className="control-button px-2 py-1 font-mono text-xs disabled:opacity-40"
                 >
-                  {activeYear + 1} ▶
+                  {Math.min(2025, activeYear + 1)}<ChevronRight size={13} className="inline-block" aria-hidden="true" />
                 </button>
               </div>
             </div>
@@ -597,6 +611,7 @@ export function CalendarChart({
                 const anomPct = row?.anomaly_pct ?? null
                 const monthKey = `${activeYear}-${String(mNum).padStart(2, '0')}`
                 const isSelected = selectedMonth === monthKey
+                const excluded = monthKey < data.filters.start_date.slice(0, 7) || monthKey > data.filters.end_date.slice(0, 7) || (data.filters.months.length > 0 && !data.filters.months.includes(mNum))
                 return (
                   <div
                     key={mNum}
@@ -631,6 +646,7 @@ export function CalendarChart({
                       <p className="font-mono text-sm font-semibold text-white">
                         {absVal == null ? '—' : number(absVal)}
                       </p>
+                      {excluded && <p className="text-[10px] text-slate-400">{t('Fora do filtro atual', 'Outside the current filter')}</p>}
                       <p className="font-mono text-[10px] text-slate-400">
                         {t('Média', 'Mean')}: {baseVal == null ? '—' : number(baseVal)} ·{' '}
                         <span
@@ -699,7 +715,9 @@ export function CalendarChart({
                           'Dados diários exatos extraídos diretamente das passagens orbitais diárias (YYYY-MM-DD) do país/células selecionadas.',
                           'Exact daily values extracted directly from the daily orbital passes (YYYY-MM-DD) for the selected country/cells.',
                         )
-                      : t(
+                      : dayData.resolution_source === 'monthly_distributed' || dayData.source === 'monthly_distributed'
+                        ? t('Estimativa visual obtida distribuindo o total mensal entre os dias. Não identifica as datas reais das detecções. Selecione um país com dados diários originais para consultar os dias observados.', 'Visual estimate obtained by distributing the monthly total across days. It does not identify actual detection dates. Select a country with original daily data to query observed days.')
+                        : t(
                           'Estimativa diária distribuída a partir das semanas ISO do cubo global para visualização rápida em escala planetária. Selecione um país para inspecionar a contagem diária exata.',
                           'Daily values distributed from the global cube ISO weeks for fast planetary-scale browsing. Select a country to inspect exact daily counts.',
                         )}
@@ -710,21 +728,33 @@ export function CalendarChart({
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
+                  disabled={activeYear === 2000 && activeMonth === 1}
                   onClick={() => stepMonth(-1)}
                   className="control-button px-2 py-1 font-mono text-xs"
                 >
-                  ◀ {t('Mês ant.', 'Prev mo.')}
+                  <ChevronLeft size={13} className="mr-1 inline-block" aria-hidden="true" />{t('Mês ant.', 'Prev mo.')}
                 </button>
                 <button
                   type="button"
+                  disabled={activeYear === 2025 && activeMonth === 12}
                   onClick={() => stepMonth(1)}
                   className="control-button px-2 py-1 font-mono text-xs"
                 >
-                  {t('Próx. mês', 'Next mo.')} ▶
+                  {t('Próx. mês', 'Next mo.')}<ChevronRight size={13} className="ml-1 inline-block" aria-hidden="true" />
                 </button>
               </div>
             </div>
 
+            {dayError && <p role="alert" className="py-1 text-xs text-amber-200">{dayError}</p>}
+            {!dayLoading && dayData && <p data-testid="calendar-source" className="py-1 text-[10px] text-slate-300">{
+              !dayData.days.some((day) => day.value != null)
+                ? t('Sem dados disponíveis neste mês. Ausência de dados é diferente de zero.', 'No data available for this month. Missing data is different from zero.')
+                : dayData.source === 'exact_daily'
+                  ? t('Dias observados na fonte original.', 'Days observed in the original source.')
+                  : dayData.resolution_source === 'monthly_distributed' || dayData.source === 'monthly_distributed'
+                    ? t('Dias estimados a partir do total mensal; datas de detecção não observadas.', 'Days estimated from the monthly total; detection dates were not observed.')
+                    : t('Dias estimados a partir de totais semanais; datas de detecção não observadas.', 'Days estimated from weekly totals; detection dates were not observed.')
+            }</p>}
             {dayLoading ? (
               <div className="flex flex-1 items-center justify-center font-mono text-xs text-purple-200">
                 {t('Carregando calendário diário…', 'Loading daily calendar…')}
@@ -760,7 +790,7 @@ export function CalendarChart({
                           onMonth(d.date.slice(0, 7))
                           onSelectDayRange?.(d.date)
                         }}
-                        title={`${d.date}: ${d.value == null ? '0' : number(d.value)} (${
+                        title={`${d.date}: ${d.value == null ? t('Sem dados', 'No data') : number(d.value)} (${
                           d.anomaly_pct == null
                             ? '—'
                             : `${d.anomaly_pct > 0 ? '+' : ''}${number(d.anomaly_pct)}%`
@@ -889,18 +919,21 @@ export function SelectionForecast({
     const risk = data?.risk_level
     if (risk === 'CRITICO') {
       return {
-        label: t('🔴 ALERTA CRÍTICO (> +25% vs F₀)', '🔴 CRITICAL ALERT (> +25% vs F₀)'),
+        label: t('ALERTA CRÍTICO (> +25% vs F₀)', 'CRITICAL ALERT (> +25% vs F₀)'),
+        icon: TriangleAlert,
         cls: 'border-red-400/50 bg-red-500/20 text-red-200',
       }
     }
     if (risk === 'ATENCAO') {
       return {
-        label: t('🟡 ATENÇÃO (Acima da Climatologia)', '🟡 WATCH (Above Climatology)'),
+        label: t('ATENÇÃO (Acima da Climatologia)', 'WATCH (Above Climatology)'),
+        icon: CircleAlert,
         cls: 'border-amber-400/50 bg-amber-500/20 text-amber-200',
       }
     }
     return {
-      label: t('🟢 NORMAL (Dentro/Abaixo da Climatologia)', '🟢 NORMAL (Within/Below Climatology)'),
+      label: t('NORMAL (Dentro/Abaixo da Climatologia)', 'NORMAL (Within/Below Climatology)'),
+      icon: CircleCheck,
       cls: 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200',
     }
   }, [data?.risk_level, t])
@@ -944,18 +977,18 @@ export function SelectionForecast({
               <button
                 type="button"
                 onClick={() => shiftReferenceWeek(-1)}
-                className="control-button px-2 py-1 font-mono text-[11px]"
+                className="control-button inline-flex items-center gap-1 px-2 py-1 font-mono text-[11px]"
                 title={t('Recuar 1 semana', 'Step back 1 week')}
               >
-                ◀ -1 {t('sem', 'wk')}
+                <ChevronLeft size={13} aria-hidden="true" />-1 {t('sem', 'wk')}
               </button>
               <button
                 type="button"
                 onClick={() => shiftReferenceWeek(1)}
-                className="control-button px-2 py-1 font-mono text-[11px]"
+                className="control-button inline-flex items-center gap-1 px-2 py-1 font-mono text-[11px]"
                 title={t('Avançar 1 semana', 'Step forward 1 week')}
               >
-                +1 {t('sem', 'wk')} ▶
+                +1 {t('sem', 'wk')}<ChevronRight size={13} aria-hidden="true" />
               </button>
             </div>
           </div>
@@ -965,20 +998,23 @@ export function SelectionForecast({
             {[
               {
                 id: 'cur2026',
-                labelPt: '📅 Ciclo 2026 (Nov/2026)',
-                labelEn: '📅 2026 Cycle (Nov/2026)',
+                labelPt: 'Ciclo 2026 (Nov/2026)',
+                labelEn: '2026 Cycle (Nov/2026)',
+                icon: CalendarDays,
                 val: '2026-11-15',
               },
               {
                 id: 'peak2026',
-                labelPt: '🔥 Pico Sazonal (Set/2026)',
-                labelEn: '🔥 Peak Season (Sep/2026)',
+                labelPt: 'Pico Sazonal (Set/2026)',
+                labelEn: 'Peak Season (Sep/2026)',
+                icon: Flame,
                 val: '2026-09-14',
               },
               {
                 id: 'last2025',
-                labelPt: '📊 Última Observada (Dez/2025)',
-                labelEn: '📊 Last Observed (Dec/2025)',
+                labelPt: 'Última Observada (Dez/2025)',
+                labelEn: 'Last Observed (Dec/2025)',
+                icon: History,
                 val: '2025-12-22',
               },
             ].map((p) => (
@@ -986,22 +1022,22 @@ export function SelectionForecast({
                 key={p.id}
                 type="button"
                 onClick={() => onReference(p.val)}
-                className={`rounded border px-2 py-1 font-mono text-[10px] transition ${
+                className={`inline-flex items-center gap-1.5 rounded border px-2 py-1 font-mono text-[10px] transition ${
                   reference === p.val
                     ? 'border-purple-400 bg-purple-500/25 text-white'
                     : 'border-white/10 bg-[#0f1623] text-slate-300 hover:border-white/25'
                 }`}
               >
-                {t(p.labelPt, p.labelEn)}
+                <p.icon size={12} aria-hidden="true" />{t(p.labelPt, p.labelEn)}
               </button>
             ))}
             {filterEndDate && filterEndDate >= '2024-01-01' && (
               <button
                 type="button"
                 onClick={() => onReference(filterEndDate)}
-                className="rounded border border-cyan-400/40 bg-cyan-500/15 px-2 py-1 font-mono text-[10px] text-cyan-200 hover:bg-cyan-500/25"
+                className="inline-flex items-center gap-1.5 rounded border border-cyan-400/40 bg-cyan-500/15 px-2 py-1 font-mono text-[10px] text-cyan-200 hover:bg-cyan-500/25"
               >
-                🔗 {t('Usar data do filtro', 'Use filter end date')} ({filterEndDate})
+                <Link2 size={12} aria-hidden="true" />{t('Usar data do filtro', 'Use filter end date')} ({filterEndDate})
               </button>
             )}
           </div>
@@ -1064,13 +1100,14 @@ export function SelectionForecast({
                 <span
                   className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${riskBadge.cls}`}
                 >
+                  <riskBadge.icon size={12} className="mr-1 shrink-0" aria-hidden="true" />
                   <span>{riskBadge.label}</span>
                   <MetricInfo
                     term={t('Nível de Alerta da Projeção', 'Forecast Alert Level')}
                   >
                     {t(
-                      'Classifica o pico de anomalia previsto nas próximas 4 semanas frente à Climatologia F₀:\n• 🟢 NORMAL: previsão dentro da média ou abaixo de +5%.\n• 🟡 ATENÇÃO: previsão entre +5% e +25% acima da climatologia.\n• 🔴 CRÍTICO: previsão supera em mais de +25% o normal sazonal.',
-                      'Classifies the peak predicted anomaly over the next 4 weeks against F₀ Climatology:\n• 🟢 NORMAL: forecast within or below +5% of baseline.\n• 🟡 WATCH: forecast between +5% and +25% above baseline.\n• 🔴 CRITICAL: forecast exceeds seasonal baseline by more than +25%.',
+                      'Classifica o pico de anomalia previsto nas próximas 4 semanas frente à Climatologia F₀:\n• NORMAL: previsão dentro da média ou abaixo de +5%.\n• ATENÇÃO: previsão entre +5% e +25% acima da climatologia.\n• CRÍTICO: previsão supera em mais de +25% o normal sazonal.',
+                      'Classifies the peak predicted anomaly over the next 4 weeks against F₀ Climatology:\n• NORMAL: forecast within or below +5% of baseline.\n• WATCH: forecast between +5% and +25% above baseline.\n• CRITICAL: forecast exceeds seasonal baseline by more than +25%.',
                     )}
                   </MetricInfo>
                 </span>
@@ -1084,15 +1121,15 @@ export function SelectionForecast({
                     onClick={() =>
                       onForecastMapHorizonChange(forecastMapHorizon ? null : 1)
                     }
-                    className={`rounded-lg border px-3 py-1.5 font-mono text-xs font-semibold transition ${
+                    className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 font-mono text-xs font-semibold transition ${
                       forecastMapHorizon
                         ? 'border-orange-400 bg-orange-500/30 text-white shadow-md'
                         : 'border-purple-400/50 bg-purple-500/20 text-purple-100 hover:bg-purple-500/30'
                     }`}
                   >
-                    {forecastMapHorizon
-                      ? `🗺️ ${t(`Mapa exibindo Previsão t+${forecastMapHorizon} (Sair)`, `Map showing Forecast t+${forecastMapHorizon} (Exit)`)}`
-                      : `🗺️ ${t('Projetar Previsão no Mapa', 'Project Forecast on Map')}`}
+                    <MapIcon size={14} aria-hidden="true" />{forecastMapHorizon
+                      ? t(`Mapa exibindo Previsão t+${forecastMapHorizon} (Sair)`, `Map showing Forecast t+${forecastMapHorizon} (Exit)`)
+                      : t('Projetar Previsão no Mapa', 'Project Forecast on Map')}
                   </button>
                   <MetricInfo
                     align="right"
@@ -1177,10 +1214,10 @@ export function SelectionForecast({
                     )}
                     <div className="mt-1.5 flex items-center justify-between border-t border-white/10 pt-1 font-mono text-[10px] text-slate-400">
                       <span>{point.target_date ? date(point.target_date) : ''}</span>
-                      <span className="text-orange-300">
+                      <span className="inline-flex items-center gap-1 text-orange-300">
                         {isMapActive
-                          ? t('📍 No mapa', '📍 On map')
-                          : t('Ver no mapa ▸', 'Show on map ▸')}
+                          ? <><MapPin size={11} aria-hidden="true" />{t('No mapa', 'On map')}</>
+                          : <>{t('Ver no mapa', 'Show on map')}<ChevronRight size={11} aria-hidden="true" /></>}
                       </span>
                     </div>
                   </div>
@@ -1472,7 +1509,7 @@ function InfoText({ text }: { text: string }) {
   return (
     <details className="rounded-lg border border-slate-700 p-2 text-xs text-slate-300">
       <summary className="cursor-pointer">
-        ⓘ {t('Método e cobertura', 'Method and coverage')}
+        <Info size={13} className="mr-1 inline-block align-middle" aria-hidden="true" />{t('Método e cobertura', 'Method and coverage')}
       </summary>
       <p className="mt-2 leading-relaxed">{text}</p>
     </details>

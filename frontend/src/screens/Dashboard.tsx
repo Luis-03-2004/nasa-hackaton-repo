@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { MapPin, TrendingUp, X } from 'lucide-react'
 import { CalendarChart, HistoryChart, SelectionForecast } from '../components/charts/ExplorationCharts'
 import { ChatAssistant } from '../components/layout/ChatAssistant'
 import { ExplorerControls } from '../components/layout/ExplorerControls'
@@ -17,7 +18,7 @@ import { loadCountries, resolveCountryShape, countryDisplayName, type CountrySha
 const DEFAULT: Omit<Query, 'locale'> = {
   country: null,
   point_ids: [],
-  start_date: '2025-10-01',
+  start_date: '2000-01-01',
   end_date: '2025-12-31',
   months: [],
   sensors: ['modis', 'viirs-snpp', 'viirs-jpss1'],
@@ -346,8 +347,8 @@ export function Dashboard() {
     <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
       <p>{selectionLabel} · {filters.start_date} → {filters.end_date} · {filters.sensors.length} {t('sensores', 'sensors')}</p>
       {gpsPoint && (
-        <span className="rounded-full border border-cyan-400/40 bg-cyan-500/15 px-2.5 py-0.5 font-mono text-[11px] text-cyan-200">
-          📍 GPS: {gpsPoint.lat.toFixed(3)}°, {gpsPoint.lon.toFixed(3)}°
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-400/40 bg-cyan-500/15 px-2.5 py-0.5 font-mono text-[11px] text-cyan-200">
+          <MapPin size={12} aria-hidden="true" />GPS: {gpsPoint.lat.toFixed(3)}°, {gpsPoint.lon.toFixed(3)}°
         </span>
       )}
       <button type="button" onClick={() => void share()} className="control-button">{t('Compartilhar filtros', 'Share filters')}</button>
@@ -412,8 +413,8 @@ export function Dashboard() {
       {forecastMapHorizon && forecast?.available && (
         <div className="mx-4 mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-orange-400/50 bg-orange-500/15 px-3 py-2 text-xs text-orange-100">
           <div className="flex flex-wrap items-center gap-2 font-mono">
-            <span>
-              🔮 {t('MODO PREVISÃO F₂ NO MAPA:', 'F₂ FORECAST MODE ON MAP:')} t+{forecastMapHorizon}{' '}
+            <span className="inline-flex items-center gap-1.5">
+              <TrendingUp size={14} aria-hidden="true" />{t('MODO PREVISÃO F₂ NO MAPA:', 'F₂ FORECAST MODE ON MAP:')} t+{forecastMapHorizon}{' '}
               ({forecast.forecasts.find((f) => f.horizon === forecastMapHorizon)?.target_date ?? reference})
             </span>
             <div className="inline-flex gap-1">
@@ -436,9 +437,9 @@ export function Dashboard() {
           <button
             type="button"
             onClick={() => setForecastMapHorizon(null)}
-            className="rounded border border-white/25 bg-black/50 px-2.5 py-1 font-mono text-[11px] text-white hover:bg-black/80"
+            className="inline-flex items-center gap-1.5 rounded border border-white/25 bg-black/50 px-2.5 py-1 font-mono text-[11px] text-white hover:bg-black/80"
           >
-            ✕ {t('Voltar às observações históricas', 'Return to historical observations')}
+            <X size={12} aria-hidden="true" />{t('Voltar às observações históricas', 'Return to historical observations')}
           </button>
         </div>
       )}
@@ -453,7 +454,7 @@ export function Dashboard() {
             <div key={side} className="relative h-[52vh] min-h-[350px] bg-[#070b12]">
               <p className="pointer-events-none absolute top-3 left-3 z-10 rounded-lg bg-[#070b12]/90 px-3 py-2 font-mono text-xs">
                 {activeForecastPts
-                  ? `🔮 F₂ t+${forecastMapHorizon} (${forecast?.forecasts.find((f) => f.horizon === forecastMapHorizon)?.target_date ?? reference}) · ${number(sideHotspots.length)} ${t('células previstas', 'predicted cells')}`
+                  ? `F₂ t+${forecastMapHorizon} (${forecast?.forecasts.find((f) => f.horizon === forecastMapHorizon)?.target_date ?? reference}) · ${number(sideHotspots.length)} ${t('células previstas', 'predicted cells')}`
                   : `${side}: ${side === 'A' ? (compare ? year : mapSubtitle) : yearB} · ${number(sideHotspots.length)} / ${number(sideMap?.points.length ?? 0)} ${t('células', 'cells')}`}
               </p>
               <div className={`h-full ${mapLoading && !activeForecastPts ? 'opacity-40' : ''}`}>{mapView(sideHotspots)}</div>
@@ -549,6 +550,12 @@ export function Dashboard() {
           data={analysis}
           selectedMonth={selectedMonth}
           onMonth={selectMonth}
+          onSelectYear={(nextYear) => {
+            setYear(nextYear)
+            setMapMonth(0)
+            setSelectedMonth('')
+            changeQuery({ ...query, start_date: `${nextYear}-01-01`, end_date: `${nextYear}-12-31`, resolution: 'monthly' })
+          }}
           onSelectDayRange={(dateStr) => {
             if (dateStr >= '2024-01-01') setReference(dateStr)
           }}
